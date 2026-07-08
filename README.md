@@ -9,7 +9,7 @@
 [![Source-only](https://img.shields.io/badge/source--only-no%20game%20data-lightgrey)](#game-data)
 [![License](https://img.shields.io/badge/license-GPLv3%20with%20additional%20terms-blue)](#license-and-notice)
 
-`ra-port` brings Red Alert to modern platforms. It currently runs as a native macOS executable and as a local Android debug APK, with SDL2 providing the platform layer.
+`ra-port` lets you play Red Alert (1996) on modern platforms. It currently runs as a native macOS executable and as a local Android debug APK, with SDL2 providing the platform layer.
 
 ![Red Alert running natively in a macOS window](docs/images/ra-port-macos-window.png)
 
