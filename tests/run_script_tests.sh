@@ -122,6 +122,15 @@ perl -0ne 'exit(/void WWMouseClass::Low_Show_Mouse\(int x, int y\)[\s\S]*MacSDL_
 perl -0ne 'exit(/void WWMouseClass::Draw_Mouse\(GraphicViewPortClass \*scr\)[\s\S]*MacSDL_TouchCursorHidden\(\)[\s\S]*return/s ? 0 : 1)' "$ROOT_DIR/WIN32LIB/KEYBOARD/MOUSE.CPP" \
   || fail "Android touch-hidden mode must suppress explicit software cursor draws"
 
+perl -0ne 'exit(/static char const \* Startup_Intro_Movie\(void\)[\s\S]*CCFileClass\("REDINTRO\.VQA"\)\.Is_Available\(\)[\s\S]*return\("REDINTRO"\);[\s\S]*return\(VQName\[VQ_REDINTRO\]\);[\s\S]*Play_Movie\(Startup_Intro_Movie\(\), THEME_NONE, false\)/s ? 0 : 1)' "$ROOT_DIR/CODE/INIT.CPP" \
+  || fail "startup intro must prefer the RA95 REDINTRO.VQA filename and fall back to the existing high-res intro entry"
+
+perl -0ne 'exit(/#else\s*\/\/WIN32[\s\S]*AnimControl\.DrawerCallback = VQ_Call_Back;[\s\S]*AnimControl\.ImageBuf = \(unsigned char \*\)SysMemPage\.Get_Offset\(\);[\s\S]*#endif\s*\/\/WIN32/s ? 0 : 1)' "$ROOT_DIR/CODE/INIT.CPP" \
+  || fail "non-Windows VQA playback must decode movie frames into SysMemPage"
+
+perl -0ne 'exit(/#else\s*\/\/WIN32\s*long VQ_Call_Back\(unsigned char \*, long \)[\s\S]*Check_VQ_Palette_Set\(\);[\s\S]*Interpolate_2X_Scale\(&SysMemPage, &SeenBuff, NULL\);[\s\S]*Call_Back\(\);/s ? 0 : 1)' "$ROOT_DIR/CODE/CONQUER.CPP" \
+  || fail "non-Windows VQA callback must apply movie palettes and present decoded SysMemPage frames"
+
 for ignored_runtime_file in \
   "SAVEGAME.*" \
   "SAVEGAME.NET" \

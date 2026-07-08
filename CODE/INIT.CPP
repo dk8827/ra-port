@@ -1540,6 +1540,25 @@ bool Select_Game(bool fade)
 
 
 /***********************************************************************************************
+ * Startup_Intro_Movie -- Selects the automatic startup movie.                                  *
+ *                                                                                             *
+ *    RA95 starts with REDINTRO.VQA. Some local asset sets may omit the nested movie archive,   *
+ *    so retain the old title-screen movie as a fallback instead of starting with a blank fade. *
+ *                                                                                             *
+ * INPUT:   none                                                                               *
+ *                                                                                             *
+ * OUTPUT:  char const *; movie to play for the automatic startup intro.                        *
+ *=============================================================================================*/
+static char const * Startup_Intro_Movie(void)
+{
+	if (CCFileClass("REDINTRO.VQA").Is_Available()) {
+		return("REDINTRO");
+	}
+	return(VQName[VQ_REDINTRO]);
+}
+
+
+/***********************************************************************************************
  * Play_Intro -- plays the introduction & logo movies                                          *
  *                                                                                             *
  * INPUT:                                                                                      *
@@ -1574,11 +1593,7 @@ static void Play_Intro(bool sequenced)
 		Hide_Mouse();
 		VisiblePage.Clear();
 		Show_Mouse();
-#ifdef WIN32
-		Play_Movie(VQ_REDINTRO, THEME_NONE, false);
-#else
-		Play_Movie(VQ_TITLE, THEME_NONE, false);
-#endif
+		Play_Movie(Startup_Intro_Movie(), THEME_NONE, false);
 	}
 }
 
@@ -1649,6 +1664,7 @@ void Anim_Init(void)
 	AnimControl.DrawerCallback = VQ_Call_Back;
 	AnimControl.ImageWidth = 320;
 	AnimControl.ImageHeight = 200;
+	AnimControl.ImageBuf = (unsigned char *)SysMemPage.Get_Offset();
 	AnimControl.Vmode = MCGA_MODE;
 	AnimControl.VBIBit = VertBlank;
 	AnimControl.DrawFlags |= VQACFGF_TOPLEFT;

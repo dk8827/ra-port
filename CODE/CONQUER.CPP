@@ -3671,9 +3671,10 @@ TechnoTypeClass const * Fetch_Techno_Type(RTTIType type, int id)
  * HISTORY:                                                                                    *
  *   06/24/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
+void Check_VQ_Palette_Set(void);
+
 #ifdef WIN32
 void VQA_PauseAudio(void);
-void Check_VQ_Palette_Set(void);
 
 extern GraphicBufferClass VQ640;
 extern bool IsVQ640;
@@ -3715,6 +3716,8 @@ long VQ_Call_Back(unsigned char *, long )
 
 long VQ_Call_Back(unsigned char *, long )
 {
+	Check_VQ_Palette_Set();
+	Interpolate_2X_Scale(&SysMemPage, &SeenBuff, NULL);
 	Call_Back();
 	if ((BreakoutAllowed || Debug_Flag) && Keyboard->Check()) {
 		if (Keyboard->Get() == KN_ESC) {
