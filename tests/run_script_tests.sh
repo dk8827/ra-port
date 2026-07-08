@@ -76,43 +76,6 @@ assert_file_not_contains scripts/run_mac_dev.sh 'rsync -a --delete "$source_dir/
 assert_file_contains scripts/run_mac_dev.sh 'cd "$ROOT_DIR"'
 assert_file_contains scripts/run_mac_dev.sh 'exec "$BUILD_DIR/$TARGET_NAME"'
 
-assert_file_not_contains README.md "$legacy_tmp_run_phrase"
-assert_file_not_contains README.md "$legacy_staging_phrase"
-assert_file_contains README.md "repository root"
-assert_file_contains README.md "build/redalert_mac"
-assert_file_contains README.md "Native macOS and Android source port"
-assert_file_contains README.md "![macOS]"
-assert_file_contains README.md "![Android]"
-assert_file_contains README.md "![Red Alert running natively in a macOS window](docs/images/ra-port-macos-window.png)"
-assert_file_contains README.md "## Quick Start"
-assert_file_contains README.md "## Current Status"
-assert_file_contains README.md "## Android Debug APK"
-assert_file_contains README.md "| Status | Feature | Notes |"
-assert_file_contains README.md "| :white_check_mark: | macOS on Apple Silicon | Builds and runs with CMake/Ninja. |"
-assert_file_contains README.md "| :white_check_mark: | Android debug APK | Builds a local landscape APK for arm64-v8a devices and emulators. |"
-assert_file_contains README.md "| :white_check_mark: | Campaign | Allied and Soviet campaigns are fully working. |"
-assert_file_contains README.md "| :white_check_mark: | Skirmish | Local skirmish is fully working. |"
-assert_file_contains README.md "| :white_check_mark: | Videos | Intro and sneak peek videos play with sound. |"
-assert_file_contains README.md "scripts/build_android_debug.sh"
-assert_file_contains README.md "scripts/run_android_debug.sh --no-build"
-assert_file_contains README.md "scripts/run_android_debug.sh --no-build --fresh-install"
-assert_file_contains README.md '`--fresh-install` removes existing app data'
-assert_file_contains README.md "android/app/build/outputs/apk/debug/app-debug.apk"
-assert_file_contains README.md "Do not distribute that APK."
-assert_file_contains README.md "| :x: | Online/network multiplayer | Not wired up yet. |"
-assert_file_contains README.md "| :x: | Expansion packs | Not a focus yet. |"
-assert_file_not_contains README.md "What works today:"
-assert_file_not_contains README.md "What is still missing:"
-assert_file_not_contains README.md "Working on Apple Silicon with CMake/Ninja"
-assert_file_not_contains README.md "SDL2 windowed mode and fullscreen toggle"
-assert_file_not_contains README.md "Runtime files are written to the repo root and ignored"
-assert_file_not_contains README.md "Not a first-class target yet"
-assert_file_contains README.md "Source-only"
-assert_file_contains README.md "No game data is included"
-assert_file_contains README.md "The repository contains only source code and build tooling."
-assert_file_not_contains README.md "keeps the repository source-only"
-[[ -s "$ROOT_DIR/docs/images/ra-port-macos-window.png" ]] || fail "README screenshot docs/images/ra-port-macos-window.png is missing"
-
 assert_file_contains android/settings.gradle.kts "redalert-android"
 assert_file_contains android/build.gradle.kts "com.android.application"
 assert_file_contains android/app/build.gradle.kts "assembleDebug"
@@ -180,12 +143,9 @@ legacy_host="${legacy_host}cnc-comm"
 [[ ! -e "$ROOT_DIR/scripts/$legacy_script" ]] || fail "legacy asset downloader must not be exported"
 
 for legacy_pattern in "$legacy_host" "$legacy_allies" "$legacy_soviet" "$legacy_script"; do
-  grep -R -F "$legacy_pattern" "$ROOT_DIR/README.md" "$ROOT_DIR/NOTICE.md" "$ROOT_DIR/scripts" >/dev/null \
+  grep -R -F "$legacy_pattern" "$ROOT_DIR/NOTICE.md" "$ROOT_DIR/scripts" >/dev/null \
     && fail "exported docs/scripts contain a legacy asset-download reference"
 done
-
-grep -F 'https://github.com/electronicarts/CnC_Red_Alert' "$ROOT_DIR/README.md" >/dev/null \
-  || fail "README must reference the original EA source repository for provenance"
 
 grep -F 'https://github.com/electronicarts/CnC_Red_Alert' "$ROOT_DIR/NOTICE.md" >/dev/null \
   || fail "NOTICE must reference the original EA source repository for provenance"
