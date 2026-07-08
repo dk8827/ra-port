@@ -3,7 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APK="$ROOT_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
+PACKAGE="com.raport.redalert"
+ACTIVITY="$PACKAGE/.RedAlertActivity"
 TAIL_LOGCAT=0
+FRESH_INSTALL=0
 BUILD_ARGS=()
 
 usage() {
@@ -14,6 +17,7 @@ Build, install with adb, and launch the Android debug APK.
 
 Options:
   --no-build        Reuse the existing APK
+  --fresh-install   Uninstall the existing app before install; removes app data
   --logcat          Tail adb logcat after launch
   -h, --help        Show this help
 USAGE
@@ -25,6 +29,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-build)
       DO_BUILD=0
+      shift
+      ;;
+    --fresh-install)
+      FRESH_INSTALL=1
       shift
       ;;
     --logcat)
@@ -65,8 +73,21 @@ if [[ ! -f "$APK" ]]; then
   exit 1
 fi
 
-adb install -r "$APK"
-adb shell am start -n com.raport.redalert/.RedAlertActivity
+if [[ "$FRESH_INSTALL" -eq 1 ]]; then
+  adb uninstall "$PACKAGE" >/dev/null 2>&1 || true
+fi
+
+install_output="$(adb install -r "$APK" 2>&1)" || {
+  printf '%s\n' "$install_output" >&2
+  if grep -F "INSTALL_FAILED_INSUFFICIENT_STORAGE" <<<"$install_output" >/dev/null; then
+    echo "The device does not have enough free space for an in-place debug APK update." >&2
+    echo "Retry with --fresh-install to uninstall the existing app first; this removes app data." >&2
+  fi
+  exit 1
+}
+printf '%s\n' "$install_output"
+
+adb shell am start -n "$ACTIVITY"
 
 if [[ "$TAIL_LOGCAT" -eq 1 ]]; then
   adb logcat -v time SDL:V RedAlertActivity:V '*:S'

@@ -1,14 +1,15 @@
 # ra-port
 
-**Native macOS source port of Command & Conquer: Red Alert.**
+**Native macOS and Android source port of Command & Conquer: Red Alert.**
 
 [![macOS](https://img.shields.io/badge/macOS-native-111111?logo=apple&logoColor=white)](#quick-start)
+[![Android](https://img.shields.io/badge/Android-debug%20APK-3ddc84?logo=android&logoColor=white)](#android-debug-apk)
 [![Build](https://img.shields.io/badge/build-CMake%20%2B%20Ninja-064f8c)](#build-from-source)
 [![Runtime](https://img.shields.io/badge/runtime-SDL2-cc3333)](#current-status)
 [![Source-only](https://img.shields.io/badge/source--only-no%20game%20data-lightgrey)](#game-data)
 [![License](https://img.shields.io/badge/license-GPLv3%20with%20additional%20terms-blue)](#license-and-notice)
 
-`ra-port` brings the released Red Alert source code to modern platforms, starting with a native macOS build. It runs in a normal macOS window and uses SDL2 for the platform layer.
+`ra-port` brings the released Red Alert source code to modern platforms. It currently runs as a native macOS executable and as a local Android debug APK, with SDL2 providing the platform layer.
 
 ![Red Alert running natively in a macOS window](docs/images/ra-port-macos-window.png)
 
@@ -16,7 +17,7 @@ The repository contains only source code and build tooling. No game data is incl
 
 ## Why This Exists
 
-Red Alert was released for a very different desktop world. This project keeps the original code recognizable while replacing the old Windows platform assumptions with a small native runtime layer. The first target is macOS on Apple Silicon; the project name leaves room for future ports such as iOS and Android.
+Red Alert was released for a very different desktop world. This project keeps the original code recognizable while replacing the old Windows platform assumptions with a small native runtime layer. The first target was macOS on Apple Silicon; Android is now available as a proof-of-work debug APK.
 
 This is an unofficial source port based on the source code Electronic Arts released under GPLv3 with additional terms: <https://github.com/electronicarts/CnC_Red_Alert>.
 
@@ -25,18 +26,20 @@ This is an unofficial source port based on the source code Electronic Arts relea
 | Status | Feature | Notes |
 | --- | --- | --- |
 | :white_check_mark: | macOS on Apple Silicon | Builds and runs with CMake/Ninja. |
+| :white_check_mark: | Android debug APK | Builds a local landscape APK for arm64-v8a devices and emulators. |
 | :white_check_mark: | Campaign | Allied and Soviet campaigns are fully working. |
 | :white_check_mark: | Skirmish | Local skirmish is fully working. |
 | :white_check_mark: | Videos | Intro and sneak peek videos play with sound. |
-| :white_check_mark: | Controls and audio | Keyboard, mouse, edge scrolling, saves, fullscreen, and audio work. |
+| :white_check_mark: | Controls and audio | macOS keyboard/mouse and Android touch/audio work. |
 | :x: | Online/network multiplayer | Not wired up yet. |
 | :x: | Launcher/setup tools | Not ported. |
 | :x: | Expansion packs | Not a focus yet. |
 | :x: | `.app` bundle | Not packaged yet; the build creates a normal macOS executable. |
+| :x: | Android release build | Only local debug APKs are supported right now. |
 
 ## Quick Start
 
-Install the build tools:
+Install the macOS build tools:
 
 ```sh
 brew install cmake ninja pkg-config sdl2
@@ -64,6 +67,13 @@ Run:
 scripts/run_mac_dev.sh --no-build
 ```
 
+To build and run the Android debug APK, install the Android prerequisites listed below, keep the same prepared local game data under `assets/redalert`, then run:
+
+```sh
+scripts/build_android_debug.sh
+scripts/run_android_debug.sh --no-build
+```
+
 ## Game Data
 
 The repository contains only source code and build tooling. It does not contain game data, movies, music, disc images, archives, installers, generated palettes, or packaged executables.
@@ -74,6 +84,8 @@ The asset preparation script copies from local paths that you provide:
 - `assets/redalert/soviet`
 
 Those directories are ignored by git. They should contain original disc-root style files such as `INSTALL/REDALERT.INI` and the base-game `.MIX` files.
+
+The Android debug build uses the same ignored `assets/redalert` tree. Gradle copies those local files into generated debug assets while building the APK; they are not checked in and they are not used for a release build.
 
 ## Build From Source
 
@@ -118,6 +130,63 @@ codesign --force --sign - build/redalert_mac
 
 Runtime files such as `SAVEGAME.*`, `OPTIONS.INI`, `ASSERT.TXT`, screenshots, logs, and generated palette caches are ignored by git.
 
+## Android Debug APK
+
+The Android target is for local development and testing only. It builds an arm64-v8a debug APK, locks the activity to landscape, uses touch-native input, and extracts the bundled debug assets into app storage on first launch.
+
+Install Android tooling:
+
+- JDK 17
+- Gradle
+- Android SDK Platform 36
+- Android SDK Build Tools
+- Android NDK `28.2.13676358`
+- Android CMake package
+- Android platform-tools for `adb`
+
+Android Studio is the easiest way to install the SDK, NDK, CMake, emulator, and platform-tools. On Homebrew-based macOS setups, the helper scripts auto-detect common `openjdk@17` and Android SDK locations when `JAVA_HOME`, `ANDROID_HOME`, or `ANDROID_SDK_ROOT` are not already set.
+
+Build the debug APK:
+
+```sh
+scripts/build_android_debug.sh
+```
+
+The first build downloads SDL2 sources into ignored local storage under `android/third_party/`. The APK is written to:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Install and launch on a connected device or emulator:
+
+```sh
+scripts/run_android_debug.sh --no-build
+```
+
+If an emulator is low on space and in-place install fails, uninstall the old debug app first:
+
+```sh
+scripts/run_android_debug.sh --no-build --fresh-install
+```
+
+`--fresh-install` removes existing app data, including extracted assets and saves.
+
+Build, install, launch, and tail Android logs:
+
+```sh
+scripts/run_android_debug.sh --logcat
+```
+
+Useful direct commands:
+
+```sh
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.raport.redalert/.RedAlertActivity
+```
+
+The debug APK intentionally includes your local ignored game data so the app can run on the device without external storage setup. Do not distribute that APK.
+
 ## Fullscreen
 
 Start fullscreen:
@@ -154,6 +223,8 @@ tests/run_script_tests.sh
 | --- | --- |
 | `CODE/` | Main Red Alert game code |
 | `PORT/MAC/` | macOS runtime, compatibility shims, SDL2 integration |
+| `PORT/ANDROID/` | Android entrypoint and platform-specific resource setup |
+| `android/` | Gradle Android app that builds the debug APK |
 | `WIN32LIB/`, `WINVQ/` | Legacy support libraries used by the port |
 | `scripts/` | Asset preparation, run helpers, smoke capture |
 | `tests/` | Focused source-level and shim tests |
