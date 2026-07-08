@@ -9,15 +9,15 @@
 [![Source-only](https://img.shields.io/badge/source--only-no%20game%20data-lightgrey)](#game-data)
 [![License](https://img.shields.io/badge/license-GPLv3%20with%20additional%20terms-blue)](#license-and-notice)
 
-`ra-port` brings the released Red Alert source code to modern platforms. It currently runs as a native macOS executable and as a local Android debug APK, with SDL2 providing the platform layer.
+`ra-port` brings Red Alert to modern platforms. It currently runs as a native macOS executable and as a local Android debug APK, with SDL2 providing the platform layer.
 
 ![Red Alert running natively in a macOS window](docs/images/ra-port-macos-window.png)
 
-The repository contains only source code and build tooling. No game data is included. To play, provide legally obtained Red Alert assets from your own discs, mounted images, or local backups.
+The repository contains only source code and build tooling. No game assets are included in the repository. To play, provide legally obtained Red Alert assets from your own discs, mounted images, or local backups.
 
 ## Why This Exists
 
-Red Alert was released for a very different desktop world. This project keeps the original code recognizable while replacing the old Windows platform assumptions with a small native runtime layer. The first target was macOS on Apple Silicon; Android is now available as a proof-of-work debug APK.
+Red Alert was released for a very different desktop world. This project keeps the original code recognizable while supporting macOS and Android.
 
 This is an unofficial source port based on the source code Electronic Arts released under GPLv3 with additional terms: <https://github.com/electronicarts/CnC_Red_Alert>.
 
@@ -29,7 +29,7 @@ This is an unofficial source port based on the source code Electronic Arts relea
 | :white_check_mark: | Android debug APK | Builds a local landscape APK for arm64-v8a devices and emulators. |
 | :white_check_mark: | Campaign | Allied and Soviet campaigns are fully working. |
 | :white_check_mark: | Skirmish | Local skirmish is fully working. |
-| :white_check_mark: | Videos | Intro and sneak peek videos play with sound. |
+| :white_check_mark: | Videos | Videos are playing with sound. |
 | :white_check_mark: | Controls and audio | macOS keyboard/mouse and Android touch/audio work. |
 | :x: | Online/network multiplayer | Not wired up yet. |
 | :x: | Launcher/setup tools | Not ported. |
