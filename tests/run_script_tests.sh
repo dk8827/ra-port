@@ -44,6 +44,8 @@ assert_file_not_contains() {
 assert_executable scripts/run_mac_dev.sh
 assert_executable scripts/prepare_assets_from_local.sh
 assert_executable scripts/smoke_mac_menu.sh
+assert_executable scripts/build_android_debug.sh
+assert_executable scripts/run_android_debug.sh
 
 legacy_stage_arg="--staging-""dir"
 legacy_tmp_dir="/tmp/redalert_""mac_run"
@@ -62,6 +64,8 @@ assert_help_contains scripts/prepare_assets_from_local.sh "--soviet"
 assert_help_contains scripts/smoke_mac_menu.sh "--seconds"
 assert_help_contains scripts/smoke_mac_menu.sh "--screenshot"
 assert_help_not_contains scripts/smoke_mac_menu.sh "$legacy_stage_arg"
+assert_help_contains scripts/build_android_debug.sh "assembleDebug"
+assert_help_contains scripts/run_android_debug.sh "adb"
 
 assert_file_not_contains scripts/run_mac_dev.sh "$legacy_tmp_dir"
 assert_file_not_contains scripts/run_mac_dev.sh "$legacy_stage_var"
@@ -98,6 +102,29 @@ assert_file_contains README.md "No game data is included"
 assert_file_contains README.md "The repository contains only source code and build tooling."
 assert_file_not_contains README.md "keeps the repository source-only"
 [[ -s "$ROOT_DIR/docs/images/ra-port-macos-window.png" ]] || fail "README screenshot docs/images/ra-port-macos-window.png is missing"
+
+assert_file_contains android/settings.gradle.kts "redalert-android"
+assert_file_contains android/build.gradle.kts "com.android.application"
+assert_file_contains android/app/build.gradle.kts "assembleDebug"
+assert_file_contains android/app/build.gradle.kts "28.2.13676358"
+assert_file_contains android/app/CMakeLists.txt "redalert_android"
+assert_file_contains android/app/src/main/AndroidManifest.xml "landscape"
+assert_file_contains android/app/src/main/AndroidManifest.xml "appCategory=\"game\""
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "SDLActivity"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "extractBundledAssets"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "controls.setOrientation(LinearLayout.VERTICAL)"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "Gravity.START | Gravity.CENTER_VERTICAL"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()"
+assert_file_contains android/app/src/main/java/com/raport/redalert/RedAlertActivity.java "SYSTEM_UI_FLAG_IMMERSIVE_STICKY"
+assert_file_contains PORT/ANDROID/src/android_main.cpp "SDL_main"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_FINGERDOWN"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_MULTIGESTURE"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_ACCELERATED"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "mac_android_idle_delay"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_Delay(1)"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "RA_PERF"
 
 for ignored_runtime_file in \
   "SAVEGAME.*" \
@@ -223,10 +250,29 @@ perl -0ne 'exit(/Session\.Type == GAME_SKIRMISH[\s\S]{0,120}Session\.Type = GAME
 grep -R -F "memcpy((char*)&Path" "$ROOT_DIR/CODE" >/dev/null \
   && fail "Path shifts must copy whole FacingType elements"
 
+perl -0ne 'exit(/void Move_Point\([^)]*\)\s*\{(?:(?!void Normal_Move_Point)[\s\S])*static signed char const CosTable\[256\](?:(?!void Normal_Move_Point)[\s\S])*static signed char const SinTable\[256\]/s ? 0 : 1)' "$ROOT_DIR/CODE/COORD.CPP" \
+  || fail "Move_Point must use signed trig tables so coordinate movement is portable across Android targets"
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 "${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" "$ROOT_DIR/tests/ddraw_shim_test.cpp" -o "$tmpdir/ddraw_shim_test"
 "$tmpdir/ddraw_shim_test"
+
+"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/CODE" \
+  "$ROOT_DIR/tests/coord_cell_test.cpp" -o "$tmpdir/coord_cell_test"
+"$tmpdir/coord_cell_test"
+
+"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -DBIG_ENDIAN=4321 -DLITTLE_ENDIAN=1234 -I"$ROOT_DIR/CODE" \
+  "$ROOT_DIR/tests/fixed_endian_test.cpp" "$ROOT_DIR/CODE/FIXED.CPP" -o "$tmpdir/fixed_endian_test"
+"$tmpdir/fixed_endian_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+  "$ROOT_DIR/tests/aspect_viewport_test.cpp" -o "$tmpdir/aspect_viewport_test"
+"$tmpdir/aspect_viewport_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+  "$ROOT_DIR/tests/android_touch_gesture_test.cpp" -o "$tmpdir/android_touch_gesture_test"
+"$tmpdir/android_touch_gesture_test"
 
 "${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WIN32LIB/SHAPE" -I"$ROOT_DIR/WIN32LIB/INCLUDE" \
   "$ROOT_DIR/tests/shape_extract_test.cpp" "$ROOT_DIR/WIN32LIB/SHAPE/GETSHAPE.CPP" -o "$tmpdir/shape_extract_test"

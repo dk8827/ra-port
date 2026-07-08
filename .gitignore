@@ -5,6 +5,13 @@ CMakeCache.txt
 compile_commands.json
 Testing/
 
+android/.gradle/
+android/build/
+android/app/.cxx/
+android/app/build/
+android/local.properties
+android/third_party/
+
 assets/
 
 # Runtime files written when running from the repository root.

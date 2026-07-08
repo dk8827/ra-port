@@ -17,6 +17,11 @@
 
 extern GraphicViewPortClass SeenBuff;
 
+void Fancy_Text_Print(char const *text, unsigned x, unsigned y, RemapControlType * fore, unsigned back, TextPrintType flag, ...);
+void Fancy_Text_Print(int text, unsigned x, unsigned y, RemapControlType * fore, unsigned back, TextPrintType flag, ...);
+void Fancy_Text_Print(char const *text, unsigned x, unsigned y, ColorType fore, unsigned back, TextPrintType flag, ...);
+void Fancy_Text_Print(int text, unsigned x, unsigned y, ColorType fore, unsigned back, TextPrintType flag, ...);
+
 /***************************************************************************
  * ListClass -- Like a Windows ListBox structure									*
  *                                                                         *

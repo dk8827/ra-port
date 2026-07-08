@@ -12,6 +12,7 @@
 #define DEFINES_H
 
 #include <stdint.h>
+#include "RA_ENDIAN.H"
 
 /**********************************************************************
 **	Language control: define the desired language for this build.
@@ -484,7 +485,7 @@ typedef unsigned short	LEPTON;
 typedef union {
 	LEPTON Raw;
 	struct {
-#ifdef BIG_ENDIAN
+#if RA_BIG_ENDIAN
 		unsigned char Cell;
 		unsigned char Lepton;
 #else
@@ -498,7 +499,7 @@ typedef uint32_t	COORDINATE;
 typedef union {
 	COORDINATE Coord;
 	struct {
-#ifdef BIG_ENDIAN
+#if RA_BIG_ENDIAN
 		LEPTON_COMPOSITE Y;
 		LEPTON_COMPOSITE X;
 #else
@@ -513,19 +514,22 @@ typedef signed short		CELL;
 typedef union {
 	CELL Cell;
 	struct {
-#ifdef BIG_ENDIAN
+#if RA_BIG_ENDIAN
 #if SLUFF_BITS
 		/*
 		**	Unused upper bits will cause problems on a big-endian machine unless they
 		**	are deliberately accounted for.
 		*/
-		unsigned sluff:SLUFF_BITS;
+		unsigned short sluff:SLUFF_BITS;
 #endif
-		unsigned Y:7;
-		unsigned X:7;
+		unsigned short Y:7;
+		unsigned short X:7;
 #else
-		unsigned X:7;
-		unsigned Y:7;
+		unsigned short X:7;
+		unsigned short Y:7;
+#if SLUFF_BITS
+		unsigned short sluff:SLUFF_BITS;
+#endif
 #endif
 	} Sub;
 } CELL_COMPOSITE;
@@ -545,7 +549,7 @@ typedef long	TARGET;
 typedef union {
 	TARGET Target;
 	struct {
-#ifdef BIG_ENDIAN
+#if RA_BIG_ENDIAN
 		unsigned Exponent:TARGET_EXPONENT;
 		unsigned Mantissa:TARGET_MANTISSA;
 #else

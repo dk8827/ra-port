@@ -4,7 +4,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
+#if defined(__ANDROID__)
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <fnmatch.h>
+#else
 #include <glob.h>
+#endif
 #include <pthread.h>
 #include <stdio.h>
 #define random macos_random
@@ -16,6 +22,10 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifndef FNM_CASEFOLD
+#define FNM_CASEFOLD 0
+#endif
 
 #if defined(__APPLE__) && defined(BIG_ENDIAN)
 #undef BIG_ENDIAN
@@ -99,9 +109,13 @@ typedef DWORD *LPDWORD;
 
 typedef int SOCKET;
 
+#if defined(__ANDROID__)
+typedef struct in_addr IN_ADDR;
+#else
 typedef struct in_addr {
 	ULONG s_addr;
 } IN_ADDR;
+#endif
 
 typedef struct WSAData {
 	WORD wVersion;
@@ -1032,9 +1046,106 @@ static inline UINT RegisterWindowMessage(LPCSTR) { return WM_USER + 100; }
 static inline int DialogBox(HANDLE, LPCTSTR, HWND, DLGPROC) { return 0; }
 
 typedef struct __win_find_handle {
+#if defined(__ANDROID__)
+	char **paths;
+	size_t count;
+#else
 	glob_t globbuf;
+#endif
 	size_t index;
 } __win_find_handle;
+
+#if defined(__ANDROID__)
+static inline char *__win_strdup(char const *text)
+{
+	size_t length = strlen(text);
+	char *copy = (char *)malloc(length + 1);
+	if (copy) {
+		memcpy(copy, text, length + 1);
+	}
+	return copy;
+}
+
+static inline char *__win_join_path(char const *directory, char const *name)
+{
+	size_t dir_len = strlen(directory);
+	size_t name_len = strlen(name);
+	int needs_slash = dir_len > 0 && strcmp(directory, ".") != 0 && directory[dir_len - 1] != '/';
+	char *path = (char *)malloc(dir_len + (needs_slash ? 1 : 0) + name_len + 1);
+	if (!path) {
+		return NULL;
+	}
+	if (strcmp(directory, ".") == 0) {
+		memcpy(path, name, name_len + 1);
+	} else {
+		memcpy(path, directory, dir_len);
+		if (needs_slash) {
+			path[dir_len++] = '/';
+		}
+		memcpy(path + dir_len, name, name_len + 1);
+	}
+	return path;
+}
+
+static inline void __win_free_find_paths(__win_find_handle *state)
+{
+	if (!state) {
+		return;
+	}
+	if (state->paths) {
+		size_t index;
+		for (index = 0; index < state->count; ++index) {
+			free(state->paths[index]);
+		}
+		free(state->paths);
+	}
+	state->paths = NULL;
+	state->count = 0;
+}
+
+static inline BOOL __win_add_find_path(__win_find_handle *state, char const *path)
+{
+	char **paths = (char **)realloc(state->paths, sizeof(char *) * (state->count + 1));
+	if (!paths) {
+		return FALSE;
+	}
+	state->paths = paths;
+	state->paths[state->count] = __win_strdup(path);
+	if (!state->paths[state->count]) {
+		return FALSE;
+	}
+	state->count++;
+	return TRUE;
+}
+
+static inline BOOL __win_split_pattern(char const *pattern, char *directory, size_t directory_size, char *name, size_t name_size)
+{
+	char const *slash = strrchr(pattern, '/');
+	size_t dir_len;
+	if (!pattern || !directory || !name || directory_size == 0 || name_size == 0) {
+		return FALSE;
+	}
+	if (!slash) {
+		strncpy(directory, ".", directory_size - 1);
+		directory[directory_size - 1] = '\0';
+		strncpy(name, pattern, name_size - 1);
+		name[name_size - 1] = '\0';
+		return TRUE;
+	}
+	dir_len = (size_t)(slash - pattern);
+	if (dir_len == 0) {
+		dir_len = 1;
+	}
+	if (dir_len >= directory_size) {
+		return FALSE;
+	}
+	memcpy(directory, pattern, dir_len);
+	directory[dir_len] = '\0';
+	strncpy(name, slash + 1, name_size - 1);
+	name[name_size - 1] = '\0';
+	return TRUE;
+}
+#endif
 
 static inline void __win_fill_find_data(char const *path, WIN32_FIND_DATA *data)
 {
@@ -1053,6 +1164,12 @@ static inline void __win_fill_find_data(char const *path, WIN32_FIND_DATA *data)
 static inline HANDLE FindFirstFile(LPCSTR pattern, WIN32_FIND_DATA *data)
 {
 	__win_find_handle *state;
+#if defined(__ANDROID__)
+	char directory[1024];
+	char name_pattern[260];
+	DIR *dir;
+	struct dirent *entry;
+#endif
 	if (!pattern || !data) {
 		return INVALID_HANDLE_VALUE;
 	}
@@ -1061,6 +1178,46 @@ static inline HANDLE FindFirstFile(LPCSTR pattern, WIN32_FIND_DATA *data)
 		return INVALID_HANDLE_VALUE;
 	}
 	memset(state, 0, sizeof(*state));
+#if defined(__ANDROID__)
+	if (!__win_split_pattern(pattern, directory, sizeof(directory), name_pattern, sizeof(name_pattern))) {
+		free(state);
+		return INVALID_HANDLE_VALUE;
+	}
+	dir = opendir(directory);
+	if (!dir) {
+		free(state);
+		return INVALID_HANDLE_VALUE;
+	}
+	while ((entry = readdir(dir)) != NULL) {
+		char *full_path;
+		if (fnmatch(name_pattern, entry->d_name, FNM_CASEFOLD) != 0) {
+			continue;
+		}
+		full_path = __win_join_path(directory, entry->d_name);
+		if (!full_path) {
+			closedir(dir);
+			__win_free_find_paths(state);
+			free(state);
+			return INVALID_HANDLE_VALUE;
+		}
+		if (!__win_add_find_path(state, full_path)) {
+			free(full_path);
+			closedir(dir);
+			__win_free_find_paths(state);
+			free(state);
+			return INVALID_HANDLE_VALUE;
+		}
+		free(full_path);
+	}
+	closedir(dir);
+	if (state->count == 0) {
+		__win_free_find_paths(state);
+		free(state);
+		return INVALID_HANDLE_VALUE;
+	}
+	state->index = 0;
+	__win_fill_find_data(state->paths[state->index], data);
+#else
 	if (glob(pattern, 0, NULL, &state->globbuf) != 0 || state->globbuf.gl_pathc == 0) {
 		globfree(&state->globbuf);
 		free(state);
@@ -1068,6 +1225,7 @@ static inline HANDLE FindFirstFile(LPCSTR pattern, WIN32_FIND_DATA *data)
 	}
 	state->index = 0;
 	__win_fill_find_data(state->globbuf.gl_pathv[state->index], data);
+#endif
 	return (HANDLE)state;
 }
 
@@ -1078,10 +1236,17 @@ static inline BOOL FindNextFile(HANDLE handle, WIN32_FIND_DATA *data)
 		return FALSE;
 	}
 	state->index++;
+#if defined(__ANDROID__)
+	if (state->index >= state->count) {
+		return FALSE;
+	}
+	__win_fill_find_data(state->paths[state->index], data);
+#else
 	if (state->index >= state->globbuf.gl_pathc) {
 		return FALSE;
 	}
 	__win_fill_find_data(state->globbuf.gl_pathv[state->index], data);
+#endif
 	return TRUE;
 }
 
@@ -1091,7 +1256,11 @@ static inline BOOL FindClose(HANDLE handle)
 	if (!state || state == (__win_find_handle *)INVALID_HANDLE_VALUE) {
 		return FALSE;
 	}
+#if defined(__ANDROID__)
+	__win_free_find_paths(state);
+#else
 	globfree(&state->globbuf);
+#endif
 	free(state);
 	return TRUE;
 }

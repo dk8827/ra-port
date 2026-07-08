@@ -11,6 +11,8 @@
 #ifndef FIXED_H
 #define FIXED_H
 
+#include "RA_ENDIAN.H"
+
 /*
 **	The "bool" integral type was defined by the C++ committee in
 **	November of '94. Until the compiler supports this, use the following
@@ -188,7 +190,7 @@ class fixed
 	private:
 		union {
 			struct {
-#ifdef BIG_ENDIAN
+#if RA_BIG_ENDIAN
 				unsigned char Whole;
 				unsigned char Fraction;
 #else

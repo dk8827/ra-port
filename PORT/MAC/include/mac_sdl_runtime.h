@@ -10,3 +10,4 @@ void MacSDL_SetPalette(PALETTEENTRY const *entries, int count);
 void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pitch);
 void MacSDL_PumpEvents(void);
 bool MacSDL_QuitRequested(void);
+bool MacSDL_TouchCursorHidden(void);

@@ -29,12 +29,7 @@
  *=============================================================================================*/
 CELL Coord_Cell(COORDINATE coord)
 {
-	CELL_COMPOSITE cell;
-	cell.Cell = 0;
-	cell.Sub.X = ((COORD_COMPOSITE &)coord).Sub.X.Sub.Cell;
-	cell.Sub.Y = ((COORD_COMPOSITE &)coord).Sub.Y.Sub.Cell;
-	return(cell.Cell);
-//	return(XY_Cell(((COORD_COMPOSITE)coord).Sub.X, ((COORD_COMPOSITE)composite).Sub.Y));
+	return(XY_Cell(Coord_XCell(coord), Coord_YCell(coord)));
 }
 
 
@@ -240,24 +235,20 @@ short const * Coord_Spillage_List(COORDINATE coord, Rect const & rect, bool noce
 	**	corners of the rectangle. The values are now absolute to the real game world rather
 	**	than relative to the coordinate.
 	*/
-	LEPTON_COMPOSITE startx;
-	LEPTON_COMPOSITE starty;
-	LEPTON_COMPOSITE endx;
-	LEPTON_COMPOSITE endy;
-	startx.Raw = (int)x + (short)Pixel_To_Lepton(rect.X);
-	starty.Raw = (int)y + (short)Pixel_To_Lepton(rect.Y);
-	endx.Raw = startx.Raw + Pixel_To_Lepton(rect.Width-1);
-	endy.Raw = starty.Raw + Pixel_To_Lepton(rect.Height-1);
+	LEPTON startx = (LEPTON)((int)x + (short)Pixel_To_Lepton(rect.X));
+	LEPTON starty = (LEPTON)((int)y + (short)Pixel_To_Lepton(rect.Y));
+	LEPTON endx = (LEPTON)(startx + Pixel_To_Lepton(rect.Width-1));
+	LEPTON endy = (LEPTON)(starty + Pixel_To_Lepton(rect.Height-1));
 
 	/*
 	**	Determine the upper left and lower right cell indexes. This is a simple conversion from
 	**	their lepton counterpart. These cells values are used to form the bounding box for the
 	**	map offset list.
 	*/
-	int cellx = startx.Sub.Cell;
-	int cellx2 = endx.Sub.Cell;
-	int celly = starty.Sub.Cell;
-	int celly2 = endy.Sub.Cell;
+	int cellx = (startx >> 8) & 0x00FF;
+	int cellx2 = (endx >> 8) & 0x00FF;
+	int celly = (starty >> 8) & 0x00FF;
+	int celly2 = (endy >> 8) & 0x00FF;
 
 	/*
 	**	Generate the spillage list by counting off the rows and colums of the cells
@@ -308,16 +299,11 @@ short const * Coord_Spillage_List(COORDINATE coord, Rect const & rect, bool noce
  *=============================================================================================*/
 COORDINATE Coord_Move(COORDINATE start, register DirType dir, unsigned short distance)
 {
-#ifdef NEVER
 	short x = Coord_X(start);
 	short y = Coord_Y(start);
 
 	Move_Point(x, y, dir, distance);
 	return(XY_Coord(x,y));
-#endif
-
-	Move_Point(*(short *)&start, *(((short *)&start)+1), dir, distance);
-	return(start);
 }
 
 
@@ -387,7 +373,7 @@ extern int calcy(signed short, short distance);
 
 void Move_Point(short &x, short &y, register DirType dir, unsigned short distance)
 {
-	static char const CosTable[256] = {
+	static signed char const CosTable[256] = {
 		0x00,0x03,0x06,0x09,0x0c,0x0f,0x12,0x15,
 		0x18,0x1b,0x1e,0x21,0x24,0x27,0x2a,0x2d,
 		0x30,0x33,0x36,0x39,0x3b,0x3e,0x41,0x43,
@@ -425,7 +411,7 @@ void Move_Point(short &x, short &y, register DirType dir, unsigned short distanc
 		0xe8,0xeb,0xee,0xf1,0xf4,0xf7,0xfa,0xfd,
 	};
 
-	static char const SinTable[256] = {
+	static signed char const SinTable[256] = {
 		0x7f,0x7e,0x7e,0x7e,0x7e,0x7e,0x7d,0x7d,
 		0x7c,0x7b,0x7b,0x7a,0x79,0x78,0x77,0x76,
 		0x75,0x74,0x72,0x71,0x70,0x6e,0x6c,0x6b,

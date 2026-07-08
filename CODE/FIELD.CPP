@@ -203,4 +203,3 @@ void FieldClass::Net_To_Host(void)
 			break;
 	}
 }
-

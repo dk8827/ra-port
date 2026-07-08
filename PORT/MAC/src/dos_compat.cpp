@@ -14,6 +14,10 @@
 #include <string>
 #include <vector>
 
+#ifndef FNM_CASEFOLD
+#define FNM_CASEFOLD 0
+#endif
+
 struct FindState {
 	std::string directory;
 	std::vector<std::string> matches;

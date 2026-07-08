@@ -106,6 +106,14 @@ OptionsClass::OptionsClass(void) :
 	KeyTeam9(KN_9),
 	KeyTeam10(KN_0)
 {
+#ifdef __ANDROID__
+	KeySidebarUp = KN_NONE;
+	KeySidebarDown = KN_NONE;
+	KeyScrollLeft = KN_LEFT;
+	KeyScrollRight = KN_RIGHT;
+	KeyScrollUp = KN_UP;
+	KeyScrollDown = KN_DOWN;
+#endif
 }
 
 

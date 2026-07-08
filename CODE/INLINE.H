@@ -72,11 +72,7 @@ inline LEPTON Pixel_To_Lepton(int pixel)
  *=============================================================================================*/
 inline COORDINATE XY_Coord(LEPTON x, LEPTON y)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Raw = x;
-	coord.Sub.Y.Raw = y;
-	return(coord.Coord);
+	return((COORDINATE)(unsigned short)x | ((COORDINATE)(unsigned short)y << 16));
 }
 
 
@@ -118,7 +114,7 @@ inline COORDINATE XYP_COORD(int x, int y)
  *=============================================================================================*/
 inline CELL Coord_XCell(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.X.Sub.Cell);
+	return((CELL)((coord >> 8) & 0x00FF));
 }
 
 
@@ -138,7 +134,7 @@ inline CELL Coord_XCell(COORDINATE coord)
  *=============================================================================================*/
 inline CELL Coord_YCell(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.Y.Sub.Cell);
+	return((CELL)((coord >> 24) & 0x00FF));
 }
 
 
@@ -159,11 +155,7 @@ inline CELL Coord_YCell(COORDINATE coord)
  *=============================================================================================*/
 inline CELL XY_Cell(int x, int y)
 {
-	CELL_COMPOSITE cell;
-	cell.Cell = 0;
-	cell.Sub.X = x;
-	cell.Sub.Y = y;
-	return(cell.Cell);
+	return((CELL)(((unsigned)x & 0x007F) | (((unsigned)y & 0x007F) << 7)));
 }
 
 
@@ -183,10 +175,7 @@ inline CELL XY_Cell(int x, int y)
  *=============================================================================================*/
 inline LEPTON Cell_To_Lepton(int cell_distance)
 {
-	LEPTON_COMPOSITE lepton;
-	lepton.Sub.Cell = (unsigned char)cell_distance;
-	lepton.Sub.Lepton = 0;
-	return(lepton.Raw);
+	return((LEPTON)((unsigned char)cell_distance << 8));
 }
 
 
@@ -208,10 +197,11 @@ inline LEPTON Cell_To_Lepton(int cell_distance)
  *=============================================================================================*/
 inline int Lepton_To_Cell(LEPTON lepton_distance)
 {
-	if (((LEPTON_COMPOSITE &)lepton_distance).Sub.Lepton >= (CELL_LEPTON_W/2)) {
-		return(((LEPTON_COMPOSITE &)lepton_distance).Sub.Cell + 1);
+	unsigned raw = (unsigned short)lepton_distance;
+	if ((raw & 0x00FF) >= (CELL_LEPTON_W/2)) {
+		return(((raw >> 8) & 0x00FF) + 1);
 	}
-	return(((LEPTON_COMPOSITE &)lepton_distance).Sub.Cell);
+	return((raw >> 8) & 0x00FF);
 }
 
 
@@ -231,7 +221,7 @@ inline int Lepton_To_Cell(LEPTON lepton_distance)
  *=============================================================================================*/
 inline LEPTON Coord_X(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.X.Raw);
+	return((LEPTON)(coord & 0x0000FFFFUL));
 }
 
 
@@ -251,7 +241,7 @@ inline LEPTON Coord_X(COORDINATE coord)
  *=============================================================================================*/
 inline LEPTON Coord_Y(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.Y.Raw);
+	return((LEPTON)((coord >> 16) & 0x0000FFFFUL));
 }
 
 
@@ -271,7 +261,7 @@ inline LEPTON Coord_Y(COORDINATE coord)
  *=============================================================================================*/
 inline int Cell_X(CELL cell)
 {
-	return(((CELL_COMPOSITE &)cell).Sub.X);
+	return((unsigned short)cell & 0x007F);
 }
 
 
@@ -291,7 +281,7 @@ inline int Cell_X(CELL cell)
  *=============================================================================================*/
 inline int Cell_Y(CELL cell)
 {
-	return(((CELL_COMPOSITE &)cell).Sub.Y);
+	return(((unsigned short)cell >> 7) & 0x007F);
 }
 
 
@@ -314,7 +304,7 @@ inline int Cell_Y(CELL cell)
  *=============================================================================================*/
 inline int Coord_XLepton(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.X.Sub.Lepton);
+	return(coord & 0x00FF);
 }
 
 
@@ -335,7 +325,7 @@ inline int Coord_XLepton(COORDINATE coord)
  *=============================================================================================*/
 inline int Coord_YLepton(COORDINATE coord)
 {
-	return(((COORD_COMPOSITE &)coord).Sub.Y.Sub.Lepton);
+	return((coord >> 16) & 0x00FF);
 }
 
 
@@ -359,11 +349,7 @@ inline int Coord_YLepton(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE XYP_Coord(int x, int y)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Raw = Pixel_To_Lepton(x);
-	coord.Sub.Y.Raw = Pixel_To_Lepton(y);
-	return(coord.Coord);
+	return(XY_Coord(Pixel_To_Lepton(x), Pixel_To_Lepton(y)));
 }
 
 
@@ -384,13 +370,9 @@ inline COORDINATE XYP_Coord(int x, int y)
  *=============================================================================================*/
 inline COORDINATE Cell_Coord(CELL cell)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Sub.Cell = (unsigned char)(((CELL_COMPOSITE &)cell).Sub.X);
-	coord.Sub.X.Sub.Lepton = (unsigned char)(CELL_LEPTON_W / 2);
-	coord.Sub.Y.Sub.Cell = (unsigned char)(((CELL_COMPOSITE &)cell).Sub.Y);
-	coord.Sub.Y.Sub.Lepton = (unsigned char)(CELL_LEPTON_W / 2);
-	return(coord.Coord);
+	return(XY_Coord(
+		(LEPTON)((Cell_X(cell) << 8) | (CELL_LEPTON_W / 2)),
+		(LEPTON)((Cell_Y(cell) << 8) | (CELL_LEPTON_W / 2))));
 }
 
 
@@ -412,9 +394,9 @@ inline COORDINATE Cell_Coord(CELL cell)
  *=============================================================================================*/
 inline COORDINATE Coord_Snap(COORDINATE coord)
 {
-	((COORD_COMPOSITE &)coord).Sub.X.Sub.Lepton = CELL_LEPTON_W/2;
-	((COORD_COMPOSITE &)coord).Sub.Y.Sub.Lepton = CELL_LEPTON_W/2;
-	return(coord);
+	return(XY_Coord(
+		(LEPTON)((Coord_X(coord) & 0xFF00) | (CELL_LEPTON_W / 2)),
+		(LEPTON)((Coord_Y(coord) & 0xFF00) | (CELL_LEPTON_W / 2))));
 }
 
 
@@ -435,9 +417,7 @@ inline COORDINATE Coord_Snap(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Fraction(COORDINATE coord)
 {
-	((COORD_COMPOSITE &)coord).Sub.X.Sub.Cell = 0;
-	((COORD_COMPOSITE &)coord).Sub.Y.Sub.Cell = 0;
-	return(coord);
+	return(coord & 0x00FF00FFUL);
 }
 
 
@@ -458,9 +438,7 @@ inline COORDINATE Coord_Fraction(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Whole(COORDINATE coord)
 {
-	((COORD_COMPOSITE &)coord).Sub.X.Sub.Lepton = 0;
-	((COORD_COMPOSITE &)coord).Sub.Y.Sub.Lepton = 0;
-	return(coord);
+	return(coord & 0xFF00FF00UL);
 }
 
 
@@ -483,11 +461,9 @@ inline COORDINATE Coord_Whole(COORDINATE coord)
  *=============================================================================================*/
 inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Raw = (LEPTON)((int)(short)((COORD_COMPOSITE &)coord1).Sub.X.Raw + (int)(short)((COORD_COMPOSITE &)coord2).Sub.X.Raw);
-	coord.Sub.Y.Raw = (LEPTON)((int)(short)((COORD_COMPOSITE &)coord1).Sub.Y.Raw + (int)(short)((COORD_COMPOSITE &)coord2).Sub.Y.Raw);
-	return(coord.Coord);
+	LEPTON x = (LEPTON)((int)(short)Coord_X(coord1) + (int)(short)Coord_X(coord2));
+	LEPTON y = (LEPTON)((int)(short)Coord_Y(coord1) + (int)(short)Coord_Y(coord2));
+	return(XY_Coord(x, y));
 }
 
 
@@ -511,11 +487,9 @@ inline COORDINATE Coord_Add(COORDINATE coord1, COORDINATE coord2)
  *=============================================================================================*/
 inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Raw = (LEPTON)((int)(short)((COORD_COMPOSITE &)coord1).Sub.X.Raw - (int)(short)((COORD_COMPOSITE &)coord2).Sub.X.Raw);
-	coord.Sub.Y.Raw = (LEPTON)((int)(short)((COORD_COMPOSITE &)coord1).Sub.Y.Raw - (int)(short)((COORD_COMPOSITE &)coord2).Sub.Y.Raw);
-	return(coord.Coord);
+	LEPTON x = (LEPTON)((int)(short)Coord_X(coord1) - (int)(short)Coord_X(coord2));
+	LEPTON y = (LEPTON)((int)(short)Coord_Y(coord1) - (int)(short)Coord_Y(coord2));
+	return(XY_Coord(x, y));
 }
 
 
@@ -537,11 +511,9 @@ inline COORDINATE Coord_Sub(COORDINATE coord1, COORDINATE coord2)
  *=============================================================================================*/
 inline COORDINATE Coord_Mid(COORDINATE coord1, COORDINATE coord2)
 {
-	COORD_COMPOSITE coord;
-
-	coord.Sub.X.Raw = (LEPTON)(((int)((COORD_COMPOSITE &)coord1).Sub.X.Raw + (int)((COORD_COMPOSITE &)coord2).Sub.X.Raw) / 2);
-	coord.Sub.Y.Raw = (LEPTON)(((int)((COORD_COMPOSITE &)coord1).Sub.Y.Raw + (int)((COORD_COMPOSITE &)coord2).Sub.Y.Raw) / 2);
-	return(coord.Coord);
+	LEPTON x = (LEPTON)(((int)Coord_X(coord1) + (int)Coord_X(coord2)) / 2);
+	LEPTON y = (LEPTON)(((int)Coord_Y(coord1) + (int)Coord_Y(coord2)) / 2);
+	return(XY_Coord(x, y));
 }
 
 

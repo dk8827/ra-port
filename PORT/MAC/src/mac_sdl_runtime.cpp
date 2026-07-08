@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include "../include/mac_sdl_runtime.h"
+#include "android_touch_gesture.h"
+#include "ra_aspect_viewport.h"
 #include <mmsystem.h>
 
 static SDL_Window *MacWindow = 0;
@@ -26,6 +28,13 @@ static int MacMessageTail = 0;
 static unsigned char MacKeyState[256];
 static unsigned char MacToggleState[256];
 static POINT MacMousePoint = {0, 0};
+
+#if defined(__ANDROID__)
+static AndroidTouchGesture AndroidTouch;
+static float AndroidPanAccumulatorX = 0.0f;
+static float AndroidPanAccumulatorY = 0.0f;
+static bool AndroidTouchCursorHidden = true;
+#endif
 
 LRESULT FAR PASCAL _export Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -61,18 +70,33 @@ static LPARAM mac_pack_xy(int x, int y)
 	return (LPARAM)(((y & 0xFFFF) << 16) | (x & 0xFFFF));
 }
 
-static void mac_to_logical_point(int *x, int *y)
+static RAAspectViewport mac_window_viewport(void)
 {
-	if (!x || !y || !MacWindow || MacWidth <= 0 || MacHeight <= 0) {
-		return;
-	}
 	int window_w = MacWidth;
 	int window_h = MacHeight;
-	SDL_GetWindowSize(MacWindow, &window_w, &window_h);
-	if (window_w > 0 && window_h > 0) {
-		*x = (*x * MacWidth) / window_w;
-		*y = (*y * MacHeight) / window_h;
+	if (MacWindow) {
+		SDL_GetWindowSize(MacWindow, &window_w, &window_h);
 	}
+	return RA_CalculateAspectViewport(MacWidth, MacHeight, window_w, window_h);
+}
+
+static RAAspectViewport mac_renderer_viewport(int source_w, int source_h)
+{
+	int output_w = source_w;
+	int output_h = source_h;
+	if (MacRenderer) {
+		SDL_GetRendererOutputSize(MacRenderer, &output_w, &output_h);
+	}
+	return RA_CalculateAspectViewport(source_w, source_h, output_w, output_h);
+}
+
+static bool mac_to_logical_point(int *x, int *y)
+{
+	if (!x || !y || !MacWindow || MacWidth <= 0 || MacHeight <= 0) {
+		return false;
+	}
+	RAAspectViewport viewport = mac_window_viewport();
+	return RA_MapViewportPoint(viewport, MacWidth, MacHeight, *x, *y, x, y) != 0;
 }
 
 static BOOL mac_queue_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -93,6 +117,53 @@ static BOOL mac_queue_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
 	return TRUE;
 }
 
+static void mac_queue_mouse_motion(int x, int y)
+{
+#if defined(__ANDROID__)
+	AndroidTouchCursorHidden = false;
+#endif
+	MacMousePoint.x = x;
+	MacMousePoint.y = y;
+	mac_queue_message((HWND)(intptr_t)1, WM_MOUSEMOVE, 0, mac_pack_xy(x, y));
+}
+
+static void mac_queue_mouse_button_with_cursor(int vk, bool down, int x, int y, bool update_cursor)
+{
+	if (update_cursor) {
+#if defined(__ANDROID__)
+		AndroidTouchCursorHidden = false;
+#endif
+		MacMousePoint.x = x;
+		MacMousePoint.y = y;
+	}
+	MacKeyState[vk & 0xFF] = down ? 1 : 0;
+	UINT message = down ? WM_LBUTTONDOWN : WM_LBUTTONUP;
+	if (vk == VK_RBUTTON) {
+		message = down ? WM_RBUTTONDOWN : WM_RBUTTONUP;
+	} else if (vk == VK_MBUTTON) {
+		message = down ? WM_MBUTTONDOWN : WM_MBUTTONUP;
+	}
+	mac_queue_message((HWND)(intptr_t)1, message, (WPARAM)vk, mac_pack_xy(x, y));
+#if defined(__ANDROID__)
+	if (!update_cursor && !down) {
+		AndroidTouchCursorHidden = true;
+	}
+#endif
+}
+
+static void mac_queue_mouse_button(int vk, bool down, int x, int y)
+{
+	mac_queue_mouse_button_with_cursor(vk, down, x, y, true);
+}
+
+static void mac_queue_key_pulse(int vk)
+{
+	MacKeyState[vk & 0xFF] = 1;
+	mac_queue_message((HWND)(intptr_t)1, WM_KEYDOWN, (WPARAM)vk, 0);
+	MacKeyState[vk & 0xFF] = 0;
+	mac_queue_message((HWND)(intptr_t)1, WM_KEYUP, (WPARAM)vk, 0);
+}
+
 static int mac_pop_message(MSG *msg, bool remove)
 {
 	if (MacMessageHead == MacMessageTail) {
@@ -106,6 +177,20 @@ static int mac_pop_message(MSG *msg, bool remove)
 	}
 	return TRUE;
 }
+
+static bool mac_has_pending_messages(void)
+{
+	return MacMessageHead != MacMessageTail;
+}
+
+#if defined(__ANDROID__)
+static void mac_android_idle_delay(bool allow_idle_delay, bool saw_sdl_event)
+{
+	if (allow_idle_delay && !saw_sdl_event && !mac_has_pending_messages()) {
+		SDL_Delay(1);
+	}
+}
+#endif
 
 static int mac_vk_from_sdl(SDL_Keycode key)
 {
@@ -273,6 +358,92 @@ static int mac_vk_from_button(unsigned char button)
 	}
 }
 
+#if defined(__ANDROID__)
+static bool android_logical_point(float normalized_x, float normalized_y, int *logical_x, int *logical_y)
+{
+	if (!MacWindow || MacWidth <= 0 || MacHeight <= 0) {
+		if (logical_x) *logical_x = 0;
+		if (logical_y) *logical_y = 0;
+		return false;
+	}
+
+	int window_w = MacWidth;
+	int window_h = MacHeight;
+	SDL_GetWindowSize(MacWindow, &window_w, &window_h);
+	if (window_w <= 0 || window_h <= 0) {
+		if (logical_x) *logical_x = 0;
+		if (logical_y) *logical_y = 0;
+		return false;
+	}
+
+	int screen_x = (int)(normalized_x * (float)window_w);
+	int screen_y = (int)(normalized_y * (float)window_h);
+	screen_x = RA_ClampInt(screen_x, 0, window_w - 1);
+	screen_y = RA_ClampInt(screen_y, 0, window_h - 1);
+
+	RAAspectViewport viewport = RA_CalculateAspectViewport(MacWidth, MacHeight, window_w, window_h);
+	return RA_MapViewportPoint(viewport, MacWidth, MacHeight, screen_x, screen_y, logical_x, logical_y) != 0;
+}
+
+static void android_emit_pan(float dx, float dy)
+{
+	static const float threshold = 24.0f;
+	AndroidPanAccumulatorX += dx * (float)MacWidth;
+	AndroidPanAccumulatorY += dy * (float)MacHeight;
+
+	while (AndroidPanAccumulatorX >= threshold) {
+		mac_queue_key_pulse(VK_LEFT);
+		AndroidPanAccumulatorX -= threshold;
+	}
+	while (AndroidPanAccumulatorX <= -threshold) {
+		mac_queue_key_pulse(VK_RIGHT);
+		AndroidPanAccumulatorX += threshold;
+	}
+	while (AndroidPanAccumulatorY >= threshold) {
+		mac_queue_key_pulse(VK_UP);
+		AndroidPanAccumulatorY -= threshold;
+	}
+	while (AndroidPanAccumulatorY <= -threshold) {
+		mac_queue_key_pulse(VK_DOWN);
+		AndroidPanAccumulatorY += threshold;
+	}
+}
+
+static void android_queue_touch_output(AndroidTouchGestureOutput const *out)
+{
+	if (!out) {
+		return;
+	}
+	for (int index = 0; index < out->count; ++index) {
+		AndroidTouchGestureEvent const *touch_event = &out->events[index];
+		switch (touch_event->type) {
+			case ANDROID_TOUCH_MOUSE_MOVE:
+				mac_queue_mouse_motion(touch_event->x, touch_event->y);
+				break;
+			case ANDROID_TOUCH_LEFT_DOWN:
+				mac_queue_mouse_button_with_cursor(VK_LBUTTON, true, touch_event->x, touch_event->y, touch_event->update_cursor != 0);
+				break;
+			case ANDROID_TOUCH_LEFT_UP:
+				mac_queue_mouse_button_with_cursor(VK_LBUTTON, false, touch_event->x, touch_event->y, touch_event->update_cursor != 0);
+				break;
+			case ANDROID_TOUCH_RIGHT_DOWN:
+				mac_queue_mouse_button_with_cursor(VK_RBUTTON, true, touch_event->x, touch_event->y, touch_event->update_cursor != 0);
+				break;
+			case ANDROID_TOUCH_RIGHT_UP:
+				mac_queue_mouse_button_with_cursor(VK_RBUTTON, false, touch_event->x, touch_event->y, touch_event->update_cursor != 0);
+				break;
+		}
+	}
+}
+
+static void android_maybe_send_long_press(void)
+{
+	AndroidTouchGestureOutput out;
+	AndroidTouchGesture_Update(&AndroidTouch, mac_now_ms(), &out);
+	android_queue_touch_output(&out);
+}
+#endif
+
 static void mac_destroy_video_objects(void)
 {
 	if (MacTexture) {
@@ -315,7 +486,17 @@ bool MacSDL_SetMode(int width, int height)
 
 	if (!MacSDLReady) {
 		SDL_SetMainReady();
+#if defined(__ANDROID__)
+		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+#else
 		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+#endif
+		SDL_SetHint(SDL_HINT_RENDER_LOGICAL_SIZE_MODE, "letterbox");
+#if defined(__ANDROID__)
+		SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+		SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+#endif
 		if (SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
 			return false;
 		}
@@ -323,6 +504,9 @@ bool MacSDL_SetMode(int width, int height)
 		MacMainThread = SDL_ThreadID();
 		mac_update_modifier_state();
 		mac_default_palette();
+#if defined(__ANDROID__)
+		AndroidTouchGesture_Init(&AndroidTouch);
+#endif
 	}
 
 	if (MacWindow && MacWidth == width && MacHeight == height) {
@@ -348,13 +532,21 @@ bool MacSDL_SetMode(int width, int height)
 		return false;
 	}
 
-	MacRenderer = SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);
+	Uint32 renderer_flags = SDL_RENDERER_SOFTWARE;
+#if defined(__ANDROID__)
+	renderer_flags = SDL_RENDERER_ACCELERATED;
+#endif
+	MacRenderer = SDL_CreateRenderer(MacWindow, -1, renderer_flags);
 	if (!MacRenderer) {
 		mac_destroy_video_objects();
 		return false;
 	}
 
-	SDL_RenderSetLogicalSize(MacRenderer, width, height);
+	SDL_RendererInfo renderer_info;
+	if (SDL_GetRendererInfo(MacRenderer, &renderer_info) == 0) {
+		SDL_Log("Red Alert renderer=%s flags=0x%08x", renderer_info.name ? renderer_info.name : "(unknown)", renderer_info.flags);
+	}
+	SDL_SetRenderDrawColor(MacRenderer, 0, 0, 0, 255);
 	MacTexture = SDL_CreateTexture(MacRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
 	return MacTexture != 0;
 }
@@ -387,7 +579,7 @@ void MacSDL_SetPalette(PALETTEENTRY const *entries, int count)
 	}
 }
 
-void MacSDL_PumpEvents(void)
+static void mac_sdl_pump_events(bool allow_idle_delay)
 {
 	if (!MacSDLReady) {
 		return;
@@ -396,8 +588,13 @@ void MacSDL_PumpEvents(void)
 		return;
 	}
 	MacMM_PumpTimers();
+#if defined(__ANDROID__)
+	android_maybe_send_long_press();
+#endif
 	SDL_Event event;
+	bool saw_sdl_event = false;
 	while (SDL_PollEvent(&event)) {
+		saw_sdl_event = true;
 		switch (event.type) {
 			case SDL_QUIT:
 				MacQuitRequested = true;
@@ -408,9 +605,7 @@ void MacSDL_PumpEvents(void)
 				int x = event.motion.x;
 				int y = event.motion.y;
 				mac_to_logical_point(&x, &y);
-				MacMousePoint.x = x;
-				MacMousePoint.y = y;
-				mac_queue_message((HWND)(intptr_t)1, WM_MOUSEMOVE, 0, mac_pack_xy(x, y));
+				mac_queue_mouse_motion(x, y);
 				break;
 			}
 
@@ -423,20 +618,57 @@ void MacSDL_PumpEvents(void)
 				int x = event.button.x;
 				int y = event.button.y;
 				mac_to_logical_point(&x, &y);
-				MacMousePoint.x = x;
-				MacMousePoint.y = y;
-				MacKeyState[vk & 0xFF] = (event.type == SDL_MOUSEBUTTONDOWN) ? 1 : 0;
-				UINT message = WM_LBUTTONDOWN;
-				if (vk == VK_RBUTTON) {
-					message = (event.type == SDL_MOUSEBUTTONDOWN) ? WM_RBUTTONDOWN : WM_RBUTTONUP;
-				} else if (vk == VK_MBUTTON) {
-					message = (event.type == SDL_MOUSEBUTTONDOWN) ? WM_MBUTTONDOWN : WM_MBUTTONUP;
-				} else {
-					message = (event.type == SDL_MOUSEBUTTONDOWN) ? WM_LBUTTONDOWN : WM_LBUTTONUP;
-				}
-				mac_queue_message((HWND)(intptr_t)1, message, (WPARAM)vk, mac_pack_xy(x, y));
+				mac_queue_mouse_button(vk, event.type == SDL_MOUSEBUTTONDOWN, x, y);
 				break;
 			}
+
+#if defined(__ANDROID__)
+			case SDL_FINGERDOWN: {
+				int x = 0;
+				int y = 0;
+				if (!android_logical_point(event.tfinger.x, event.tfinger.y, &x, &y)) {
+					break;
+				}
+				AndroidTouchGestureOutput out;
+				AndroidTouchGesture_Begin(&AndroidTouch, (long long)event.tfinger.fingerId, x, y, mac_now_ms(), &out);
+				if (AndroidTouch.secondary_active && AndroidTouch.secondary_finger == (long long)event.tfinger.fingerId) {
+					AndroidPanAccumulatorX = 0.0f;
+					AndroidPanAccumulatorY = 0.0f;
+				}
+				android_queue_touch_output(&out);
+				break;
+			}
+
+			case SDL_FINGERMOTION: {
+				int x = 0;
+				int y = 0;
+				android_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
+				if (AndroidTouchGesture_IsPanFinger(&AndroidTouch, (long long)event.tfinger.fingerId)) {
+					android_emit_pan(event.tfinger.dx, event.tfinger.dy);
+					break;
+				}
+				AndroidTouchGestureOutput out;
+				AndroidTouchGesture_Move(&AndroidTouch, (long long)event.tfinger.fingerId, x, y, &out);
+				android_queue_touch_output(&out);
+				break;
+			}
+
+			case SDL_FINGERUP: {
+				int x = 0;
+				int y = 0;
+				android_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
+				AndroidTouchGestureOutput out;
+				AndroidTouchGesture_End(&AndroidTouch, (long long)event.tfinger.fingerId, x, y, &out);
+				android_queue_touch_output(&out);
+				break;
+			}
+
+			case SDL_MULTIGESTURE:
+				if (AndroidTouch.secondary_active) {
+					android_emit_pan(event.mgesture.x, event.mgesture.y);
+				}
+				break;
+#endif
 
 			case SDL_KEYDOWN:
 			case SDL_KEYUP: {
@@ -460,11 +692,28 @@ void MacSDL_PumpEvents(void)
 				break;
 		}
 	}
+#if defined(__ANDROID__)
+	mac_android_idle_delay(allow_idle_delay, saw_sdl_event);
+#endif
+}
+
+void MacSDL_PumpEvents(void)
+{
+	mac_sdl_pump_events(true);
 }
 
 bool MacSDL_QuitRequested(void)
 {
 	return MacQuitRequested;
+}
+
+bool MacSDL_TouchCursorHidden(void)
+{
+#if defined(__ANDROID__)
+	return AndroidTouchCursorHidden;
+#else
+	return false;
+#endif
 }
 
 void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pitch)
@@ -476,7 +725,7 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 		return;
 	}
 
-	MacSDL_PumpEvents();
+	mac_sdl_pump_events(false);
 	if (!MacRenderer || !MacTexture) {
 		return;
 	}
@@ -500,20 +749,30 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 	}
 
 	SDL_UpdateTexture(MacTexture, 0, MacFrame, width * (int)sizeof(uint32_t));
+	RAAspectViewport viewport = mac_renderer_viewport(width, height);
+	SDL_Rect destination;
+	destination.x = viewport.x;
+	destination.y = viewport.y;
+	destination.w = viewport.w;
+	destination.h = viewport.h;
+	if (destination.w <= 0 || destination.h <= 0) {
+		return;
+	}
+	SDL_SetRenderDrawColor(MacRenderer, 0, 0, 0, 255);
 	SDL_RenderClear(MacRenderer);
-	SDL_RenderCopy(MacRenderer, MacTexture, 0, 0);
+	SDL_RenderCopy(MacRenderer, MacTexture, 0, &destination);
 	SDL_RenderPresent(MacRenderer);
 }
 
 extern "C" BOOL MacWin_PeekMessage(MSG *msg, HWND, UINT, UINT, UINT remove)
 {
-	MacSDL_PumpEvents();
+	mac_sdl_pump_events(true);
 	return mac_pop_message(msg, (remove & PM_REMOVE) != 0);
 }
 
 extern "C" BOOL MacWin_GetMessage(MSG *msg, HWND, UINT, UINT)
 {
-	MacSDL_PumpEvents();
+	mac_sdl_pump_events(true);
 	if (!mac_pop_message(msg, true)) {
 		return FALSE;
 	}

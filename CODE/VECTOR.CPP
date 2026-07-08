@@ -637,6 +637,7 @@ template class VectorClass<FileEntryClass *>;
 template class VectorClass<PhoneEntryClass *>;
 template class VectorClass<RemapControlType *>;
 template class VectorClass<EgoClass *>;
+template class VectorClass<unsigned char>;
 template class VectorClass<char const *>;
 template class VectorClass<char *>;
 template class VectorClass<void *>;
