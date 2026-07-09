@@ -514,7 +514,7 @@ OverlayTypeClass::OverlayTypeClass(
  * HISTORY:                                                                                    *
  *   07/09/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * OverlayTypeClass::operator new(size_t)
+void * OverlayTypeClass::operator new(size_t) throw()
 {
 	return(OverlayTypes.Alloc());
 }

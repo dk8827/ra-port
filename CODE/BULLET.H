@@ -45,7 +45,7 @@ class BulletClass :	public ObjectClass,
 		/*---------------------------------------------------------------------
 		**	Constructors, Destructors, and overloaded operators.
 		*/
-		static void * operator new(size_t size);
+		static void * operator new(size_t size) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void *ptr);
 		BulletClass(BulletType id, TARGET target, TechnoClass * Payback, int strength, WarheadType warhead, int speed);

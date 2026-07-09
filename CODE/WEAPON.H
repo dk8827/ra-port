@@ -24,7 +24,7 @@ class WeaponTypeClass
 		WeaponTypeClass(NoInitClass const &) {}
 		~WeaponTypeClass(void);
 
-		void * operator new(size_t);
+		void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		void operator delete(void * pointer);
 

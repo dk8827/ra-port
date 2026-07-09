@@ -2484,7 +2484,7 @@ TemplateTypeClass::TemplateTypeClass(
  * HISTORY:                                                                                    *
  *   07/06/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * TemplateTypeClass::operator new(size_t)
+void * TemplateTypeClass::operator new(size_t) throw()
 {
 	return(TemplateTypes.Alloc());
 }

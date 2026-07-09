@@ -296,7 +296,7 @@ HouseTypeClass::HouseTypeClass(
  * HISTORY:                                                                                    *
  *   09/04/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * HouseTypeClass::operator new(size_t)
+void * HouseTypeClass::operator new(size_t) throw()
 {
 	return(HouseTypes.Alloc());
 }

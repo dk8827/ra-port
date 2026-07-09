@@ -228,7 +228,7 @@ VesselTypeClass::VesselTypeClass(
  * HISTORY:                                                                                    *
  *   07/09/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * VesselTypeClass::operator new(size_t)
+void * VesselTypeClass::operator new(size_t) throw()
 {
 	return(VesselTypes.Alloc());
 }

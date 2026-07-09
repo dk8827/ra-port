@@ -2075,7 +2075,7 @@ AnimTypeClass::AnimTypeClass(
  * HISTORY:                                                                                    *
  *   07/09/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * AnimTypeClass::operator new(size_t)
+void * AnimTypeClass::operator new(size_t) throw()
 {
 	return(AnimTypes.Alloc());
 }

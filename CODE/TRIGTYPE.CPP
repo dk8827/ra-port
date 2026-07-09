@@ -74,7 +74,7 @@ TriggerTypeClass::~TriggerTypeClass(void)
  * HISTORY:                                                                                    *
  *   07/09/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * TriggerTypeClass::operator new(size_t )
+void * TriggerTypeClass::operator new(size_t ) throw()
 {
 	void * ptr = TriggerTypes.Allocate();
 	if (ptr) {

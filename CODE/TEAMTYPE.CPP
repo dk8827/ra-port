@@ -250,7 +250,7 @@ char const * TeamTypeClass::Name_From_Mission(TeamMissionType order)
  * HISTORY:                                                                *
  *   11/28/1994 BR : Created.                                              *
  *=========================================================================*/
-void * TeamTypeClass::operator new(size_t )
+void * TeamTypeClass::operator new(size_t ) throw()
 {
 	void * ptr = TeamTypes.Allocate();
 	if (ptr) {
