@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#define WSA_FILE_HEADER_SIZE 16
+// 6 u16 fields + i16 flags = 14 bytes before the frame offset table.
+#define WSA_FILE_HEADER_SIZE 14
 #define WSA_FILE_OFFSET_SIZE 4
 
 static inline uint32_t WSA_Read_File_Offset(char const *file_buffer, int frame)
