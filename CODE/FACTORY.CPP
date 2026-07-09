@@ -102,7 +102,7 @@ void FactoryClass::Init(void)
  * HISTORY:                                                                                    *
  *   12/26/1994 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * FactoryClass::operator new(size_t)
+void * FactoryClass::operator new(size_t) throw()
 {
 	void * ptr = Factories.Allocate();
 	if (ptr) {

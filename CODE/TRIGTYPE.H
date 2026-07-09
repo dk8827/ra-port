@@ -76,7 +76,7 @@ class TriggerTypeClass : public AbstractTypeClass
 		TriggerTypeClass(NoInitClass const & x) : AbstractTypeClass(x), Event1(x), Event2(x), Action1(x), Action2(x) {};
 		virtual ~TriggerTypeClass(void);
 
-		static void * operator new(size_t );
+		static void * operator new(size_t ) throw();
 		static void * operator new(size_t, void * ptr) {return(ptr);};
 		static void operator delete(void *ptr);
 
