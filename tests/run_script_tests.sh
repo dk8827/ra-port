@@ -151,8 +151,11 @@ perl -0ne 'exit(/run_build\(\)[\s\S]*local build_args=\([\s\S]*if \(\(\$\{#BUILD
   || fail "iOS simulator script must avoid expanding an empty BUILD_ARGS array under macOS bash nounset"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_FINGERDOWN"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_MULTIGESTURE"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobilePan_IgnoreMultiGestureCenter"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_emit_pan(event.mgesture.x, event.mgesture.y)"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "RA_MOBILE_TOUCH"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobileTouchGesture"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobilePointerDragCandidate"
 assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_ACCELERATED"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_idle_delay"
@@ -164,6 +167,11 @@ assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "AndroidTouchGesture"
 assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "#if defined(__ANDROID__)"
 assert_file_contains CODE/TAB.CPP "Mobile touch taps can land on the exact top row"
 assert_file_contains CODE/DISPLAY.CPP "RA_MOBILE_TOUCH"
+perl -0ne 'exit(/void DisplayClass::Mouse_Left_Release\([^\)]*\)[\s\S]*MobileRubberBand_ShouldCommitCandidateOnRelease[\s\S]*if \(IsRubberBand \|\| mobile_fast_rubber_band\)/s ? 0 : 1)' "$ROOT_DIR/CODE/DISPLAY.CPP" \
+  || fail "mobile touch fast rubber-band fallback must be in Mouse_Left_Release"
+assert_file_contains CODE/DISPLAY.CPP "MacSDL_ConsumeMobilePointerDrag"
+assert_file_not_contains CODE/DISPLAY.CPP "RA_TOUCH_"
+assert_file_not_contains CODE/DISPLAY.CPP "ra_touch_debug"
 assert_file_contains WIN32LIB/KEYBOARD/MOUSE.CPP "RA_MOBILE_TOUCH"
 assert_file_contains WIN32LIB/KEYBOARD/MOUSE.CPP "mac_sdl_runtime.h"
 assert_file_contains WIN32LIB/KEYBOARD/MOUSE.CPP "MacSDL_TouchCursorHidden()"
@@ -351,6 +359,18 @@ trap 'rm -rf "$tmpdir"' EXIT
 "${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
   "$ROOT_DIR/tests/mobile_touch_gesture_test.cpp" -o "$tmpdir/mobile_touch_gesture_test"
 "$tmpdir/mobile_touch_gesture_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+  "$ROOT_DIR/tests/mobile_pan_test.cpp" -o "$tmpdir/mobile_pan_test"
+"$tmpdir/mobile_pan_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+  "$ROOT_DIR/tests/mobile_key_message_test.cpp" -o "$tmpdir/mobile_key_message_test"
+"$tmpdir/mobile_key_message_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+  "$ROOT_DIR/tests/mobile_rubber_band_test.cpp" -o "$tmpdir/mobile_rubber_band_test"
+"$tmpdir/mobile_rubber_band_test"
 
 "${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WIN32LIB/SHAPE" -I"$ROOT_DIR/WIN32LIB/INCLUDE" \
   "$ROOT_DIR/tests/shape_extract_test.cpp" "$ROOT_DIR/WIN32LIB/SHAPE/GETSHAPE.CPP" -o "$tmpdir/shape_extract_test"

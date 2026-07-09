@@ -11,3 +11,4 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 void MacSDL_PumpEvents(void);
 bool MacSDL_QuitRequested(void);
 bool MacSDL_TouchCursorHidden(void);
+int MacSDL_ConsumeMobilePointerDrag(int *x, int *y);

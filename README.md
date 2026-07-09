@@ -147,7 +147,7 @@ The Android target is for local development and testing only. It builds an arm64
 Install Android tooling:
 
 - JDK 17
-- Gradle
+- Gradle compatible with Android Gradle Plugin 9.2.0
 - Android SDK Platform 36
 - Android SDK Build Tools
 - Android NDK `28.2.13676358`
@@ -225,7 +225,7 @@ Install and launch on the booted iOS simulator:
 scripts/run_ios_simulator.sh --no-build
 ```
 
-Build for a connected iPhone or iPad:
+Build a signed device app for iPhone or iPad:
 
 ```sh
 RA_IOS_DEVELOPMENT_TEAM=TEAMID scripts/build_ios_debug.sh --device
@@ -280,7 +280,7 @@ tests/run_script_tests.sh
 
 ## Contributing
 
-The port is intentionally conservative: keep original source layout and behavior recognizable, and prefer small platform-specific support files over broad rewrites. Good next areas are macOS packaging, Intel macOS validation, save/load hardening, expansion support, and eventually non-macOS platform layers.
+The port is intentionally conservative: keep original source layout and behavior recognizable, and prefer small platform-specific support files over broad rewrites. Good next areas are macOS `.app` packaging, Android/iOS release packaging, physical device validation, Intel macOS validation, save/load hardening, expansion support, CI coverage, and mobile input/UI polish.
 
 Network and online multiplayer are out of scope for the current milestone.
 

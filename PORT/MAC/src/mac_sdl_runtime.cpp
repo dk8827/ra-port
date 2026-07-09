@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include "../include/mac_sdl_runtime.h"
+#include "mobile_key_message.h"
+#include "mobile_pan.h"
 #include "mobile_touch_gesture.h"
 #include "ra_aspect_viewport.h"
 #include <mmsystem.h>
@@ -28,12 +30,15 @@ static int MacMessageTail = 0;
 static unsigned char MacKeyState[256];
 static unsigned char MacToggleState[256];
 static POINT MacMousePoint = {0, 0};
+static bool MacUnmodifiedKeyDispatch = false;
 
 #if defined(RA_MOBILE_TOUCH)
 static MobileTouchGesture MobileTouch;
-static float MobilePanAccumulatorX = 0.0f;
-static float MobilePanAccumulatorY = 0.0f;
+static MobilePanState MobilePan;
 static bool MobileTouchCursorHidden = true;
+static bool MobilePointerDragCandidate = false;
+static int MobilePointerDragStartX = 0;
+static int MobilePointerDragStartY = 0;
 #endif
 
 LRESULT FAR PASCAL _export Windows_Procedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -131,6 +136,15 @@ static void mac_queue_mouse_button_with_cursor(int vk, bool down, int x, int y, 
 {
 	MacMousePoint.x = x;
 	MacMousePoint.y = y;
+#if defined(RA_MOBILE_TOUCH)
+	if (vk == VK_LBUTTON && down) {
+		MobilePointerDragCandidate = true;
+		MobilePointerDragStartX = x;
+		MobilePointerDragStartY = y;
+	} else if (vk != VK_LBUTTON && down) {
+		MobilePointerDragCandidate = false;
+	}
+#endif
 	if (update_cursor) {
 #if defined(RA_MOBILE_TOUCH)
 		MobileTouchCursorHidden = false;
@@ -162,6 +176,14 @@ static void mac_queue_key_pulse(int vk)
 	mac_queue_message((HWND)(intptr_t)1, WM_KEYDOWN, (WPARAM)vk, 0);
 	MacKeyState[vk & 0xFF] = 0;
 	mac_queue_message((HWND)(intptr_t)1, WM_KEYUP, (WPARAM)vk, 0);
+}
+
+static void mac_queue_unmodified_key_pulse(int vk)
+{
+	MacKeyState[vk & 0xFF] = 1;
+	mac_queue_message((HWND)(intptr_t)1, WM_KEYDOWN, (WPARAM)vk, MOBILE_KEY_UNMODIFIED_LPARAM);
+	MacKeyState[vk & 0xFF] = 0;
+	mac_queue_message((HWND)(intptr_t)1, WM_KEYUP, (WPARAM)vk, MOBILE_KEY_UNMODIFIED_LPARAM);
 }
 
 static int mac_pop_message(MSG *msg, bool remove)
@@ -385,28 +407,14 @@ static bool mobile_logical_point(float normalized_x, float normalized_y, int *lo
 	return RA_MapViewportPoint(viewport, MacWidth, MacHeight, screen_x, screen_y, logical_x, logical_y) != 0;
 }
 
+static void mobile_emit_pan_key(void *, int vk)
+{
+	mac_queue_unmodified_key_pulse(vk);
+}
+
 static void mobile_emit_pan(float dx, float dy)
 {
-	static const float threshold = 24.0f;
-	MobilePanAccumulatorX += dx * (float)MacWidth;
-	MobilePanAccumulatorY += dy * (float)MacHeight;
-
-	while (MobilePanAccumulatorX >= threshold) {
-		mac_queue_key_pulse(VK_LEFT);
-		MobilePanAccumulatorX -= threshold;
-	}
-	while (MobilePanAccumulatorX <= -threshold) {
-		mac_queue_key_pulse(VK_RIGHT);
-		MobilePanAccumulatorX += threshold;
-	}
-	while (MobilePanAccumulatorY >= threshold) {
-		mac_queue_key_pulse(VK_UP);
-		MobilePanAccumulatorY -= threshold;
-	}
-	while (MobilePanAccumulatorY <= -threshold) {
-		mac_queue_key_pulse(VK_DOWN);
-		MobilePanAccumulatorY += threshold;
-	}
+	MobilePan_EmitFingerDelta(&MobilePan, dx, dy, MacWidth, MacHeight, mobile_emit_pan_key, 0);
 }
 
 static void mobile_queue_touch_output(MobileTouchGestureOutput const *out)
@@ -510,6 +518,7 @@ bool MacSDL_SetMode(int width, int height)
 		mac_default_palette();
 #if defined(RA_MOBILE_TOUCH)
 		MobileTouchGesture_Init(&MobileTouch);
+		MobilePan_Init(&MobilePan);
 #endif
 	}
 
@@ -642,8 +651,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				MobileTouchGestureOutput out;
 				MobileTouchGesture_Begin(&MobileTouch, (long long)event.tfinger.fingerId, x, y, mac_now_ms(), &out);
 				if (MobileTouch.secondary_active && MobileTouch.secondary_finger == (long long)event.tfinger.fingerId) {
-					MobilePanAccumulatorX = 0.0f;
-					MobilePanAccumulatorY = 0.0f;
+					MobilePan_Reset(&MobilePan);
 				}
 				mobile_queue_touch_output(&out);
 				break;
@@ -675,7 +683,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 
 			case SDL_MULTIGESTURE:
 				if (MobileTouch.secondary_active) {
-					mobile_emit_pan(event.mgesture.x, event.mgesture.y);
+					MobilePan_IgnoreMultiGestureCenter(&MobilePan, event.mgesture.x, event.mgesture.y, MacWidth, MacHeight, mobile_emit_pan_key, 0);
 				}
 				break;
 #endif
@@ -723,6 +731,27 @@ bool MacSDL_TouchCursorHidden(void)
 	return MobileTouchCursorHidden;
 #else
 	return false;
+#endif
+}
+
+int MacSDL_ConsumeMobilePointerDrag(int *x, int *y)
+{
+#if defined(RA_MOBILE_TOUCH)
+	if (!MobilePointerDragCandidate) {
+		return 0;
+	}
+	MobilePointerDragCandidate = false;
+	if (x) {
+		*x = MobilePointerDragStartX;
+	}
+	if (y) {
+		*y = MobilePointerDragStartY;
+	}
+	return 1;
+#else
+	(void)x;
+	(void)y;
+	return 0;
 #endif
 }
 
@@ -799,7 +828,11 @@ extern "C" LRESULT MacWin_DispatchMessage(MSG const *msg)
 	if (!msg) {
 		return 0;
 	}
-	return Windows_Procedure(msg->hwnd, msg->message, msg->wParam, msg->lParam);
+	bool previous = MacUnmodifiedKeyDispatch;
+	MacUnmodifiedKeyDispatch = MobileKeyMessage_IsUnmodified(msg->message, msg->lParam) != 0;
+	LRESULT result = Windows_Procedure(msg->hwnd, msg->message, msg->wParam, msg->lParam);
+	MacUnmodifiedKeyDispatch = previous;
+	return result;
 }
 
 extern "C" BOOL MacWin_PostMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
@@ -825,7 +858,7 @@ extern "C" short MacWin_GetKeyState(int key)
 	if (MacToggleState[key]) {
 		state |= (short)0x0009;
 	}
-	return state;
+	return MobileKeyMessage_FilterKeyState(MacUnmodifiedKeyDispatch, key, state);
 }
 
 extern "C" int MacWin_ToAscii(UINT virt_key, UINT, BYTE const *key_state, LPWORD trans_key, UINT)

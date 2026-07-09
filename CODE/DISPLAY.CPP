@@ -10,6 +10,9 @@
 
 #include	"function.h"
 #include	"mac_sdl_runtime.h"
+#if defined(RA_MOBILE_TOUCH)
+#include	"mobile_rubber_band.h"
+#endif
 #include	"vortex.h"
 
 /*
@@ -111,6 +114,9 @@ DisplayClass::DisplayClass(void) :
 	IsTargettingMode(SPC_NONE),
 	IsRubberBand(false),
 	IsTentative(false),
+#if defined(RA_MOBILE_TOUCH)
+	IsMobileRubberBandCandidate(false),
+#endif
 	IsShadowPresent(false),
 	BandX(0),
 	BandY(0),
@@ -206,6 +212,9 @@ void DisplayClass::Init_Clear(void)
 	IsRepairMode = false;
 	IsRubberBand = false;
 	IsTentative = false;
+#if defined(RA_MOBILE_TOUCH)
+	IsMobileRubberBandCandidate = false;
+#endif
 	IsSellMode = false;
 
 	/*
@@ -2973,6 +2982,10 @@ int DisplayClass::TacticalClass::Action(unsigned flags, KeyNumType & key)
  *=============================================================================================*/
 void DisplayClass::Mouse_Right_Press(void)
 {
+#if defined(RA_MOBILE_TOUCH)
+	IsMobileRubberBandCandidate = false;
+#endif
+
 	if (PendingObjectPtr && PendingObjectPtr->Is_Techno()) {
 		//PendingObjectPtr->Transmit_Message(RADIO_OVER_OUT);
 		PendingObjectPtr = 0;
@@ -3354,9 +3367,34 @@ void DisplayClass::Mouse_Left_Release(CELL cell, int x, int y, ObjectClass * obj
 
 	} else {
 
-		if (IsRubberBand) {
+		bool mobile_fast_rubber_band = false;
+		int rubber_band_start_x = BandX;
+		int rubber_band_start_y = BandY;
+#if defined(RA_MOBILE_TOUCH)
+		int mobile_drag_start_x = 0;
+		int mobile_drag_start_y = 0;
+		int mobile_pointer_drag = MacSDL_ConsumeMobilePointerDrag(&mobile_drag_start_x, &mobile_drag_start_y);
+		int mobile_drag_origin_valid = mobile_pointer_drag && !wsmall && Pixel_To_Coord(mobile_drag_start_x, mobile_drag_start_y);
+		if (mobile_drag_origin_valid) {
+			rubber_band_start_x = mobile_drag_start_x - TacPixelX;
+			rubber_band_start_y = mobile_drag_start_y - TacPixelY;
+		} else {
+			mobile_pointer_drag = 0;
+		}
+		mobile_fast_rubber_band = MobileRubberBand_ShouldCommitCandidateOnRelease(
+			IsRubberBand,
+			IsTentative,
+			IsMobileRubberBandCandidate || mobile_pointer_drag,
+			rubber_band_start_x,
+			rubber_band_start_y,
+			x,
+			y) != 0;
+		IsMobileRubberBandCandidate = false;
+#endif
+
+		if (IsRubberBand || mobile_fast_rubber_band) {
 			Refresh_Band();
-			Select_These(XYP_Coord(BandX, BandY), XYP_Coord(x, y));
+			Select_These(XYP_Coord(rubber_band_start_x, rubber_band_start_y), XYP_Coord(x, y));
 
 			Set_Default_Mouse(MOUSE_NORMAL, wsmall);
 			IsRubberBand = false;
@@ -3621,10 +3659,17 @@ void DisplayClass::Mouse_Left_Press(int x, int y)
 {
 	if (!IsRepairMode && !IsSellMode && IsTargettingMode == SPC_NONE && !PendingObject) {
 		IsTentative = true;
+#if defined(RA_MOBILE_TOUCH)
+		IsMobileRubberBandCandidate = true;
+#endif
 		BandX = x;
 		BandY = y;
 		NewX = x;
 		NewY = y;
+#if defined(RA_MOBILE_TOUCH)
+	} else {
+		IsMobileRubberBandCandidate = false;
+#endif
 	}
 }
 

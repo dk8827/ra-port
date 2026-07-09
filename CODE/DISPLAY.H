@@ -238,6 +238,15 @@ class DisplayClass: public MapClass
 		*/
 		unsigned IsTentative:1;
 
+#if defined(RA_MOBILE_TOUCH)
+		/*
+		**	Mobile touch can clear IsTentative through cursor hover updates before
+		**	the release event is processed. Keep the press anchor eligible for
+		**	drag selection until the matching mobile release arrives.
+		*/
+		unsigned IsMobileRubberBandCandidate:1;
+#endif
+
 		/*
 		**	This gadget class is used for capturing input to the tactical map. All mouse input
 		**	will be routed through this gadget.
