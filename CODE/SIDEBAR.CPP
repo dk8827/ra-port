@@ -1184,7 +1184,12 @@ void SidebarClass::StripClass::Init_Theater(TheaterType theater)
 		**	Make sure that remapping doesn't occur on the colors that cycle.
 		*/
 		PaletteClass pal = OriginalPalette;
-		memset(&pal[CYCLE_COLOR_START*3], 0x3f, CYCLE_COLOR_COUNT*3);
+		/*
+		**	PaletteClass::operator[] indexes whole RGB entries, not raw bytes;
+		**	the historical "*3" byte-style index wrote 0x3f well past the end
+		**	of the palette, scribbling on the stack.
+		*/
+		memset(&pal[CYCLE_COLOR_START], 0x3f, CYCLE_COLOR_COUNT * sizeof(RGBClass));
 		Build_Translucent_Table(pal, &ClockCols[0], 1, (void*)ClockTranslucentTable);
 
 //		Mem_Copy(GamePalette, OriginalPalette, 768);
