@@ -333,6 +333,12 @@ grep -F "Scen.ScenarioName[2] != 'U' && Scen.ScenarioName[2] != 'G'" "$ROOT_DIR/
 perl -0ne 'exit(/Session\.Type == GAME_SKIRMISH[\s\S]{0,120}Session\.Type = GAME_NORMAL[\s\S]{0,120}selection = SEL_NONE/s ? 0 : 1)' "$ROOT_DIR/CODE/INIT.CPP" \
   || fail "returning from skirmish must reset to the main menu instead of auto-starting skirmish"
 
+perl -0ne 'exit(/static\s+void\s+\*\s+operator new\s*\(\s*size_t\s+size\s*\)\s*throw\s*\(\s*\)\s*;/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.H" \
+  || fail "AnimClass pool allocation must be declared non-throwing so exhausted pools return NULL instead of constructing at address zero"
+
+perl -0ne 'exit(/void\s+\*\s+AnimClass::operator new\s*\(\s*size_t\s*\)\s*throw\s*\(\s*\)/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.CPP" \
+  || fail "AnimClass pool allocation definition must be non-throwing so exhausted pools return NULL instead of constructing at address zero"
+
 grep -R -F "memcpy((char*)&Path" "$ROOT_DIR/CODE" >/dev/null \
   && fail "Path shifts must copy whole FacingType elements"
 
