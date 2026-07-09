@@ -145,15 +145,14 @@ static inline void MobileTouchGesture_Move(
 		return;
 	}
 
-	if (!touch->long_press_sent) {
-		if (!touch->left_down && MobileTouchGesture_MovedPastSlop(touch, x, y)) {
-			touch->left_down = 1;
-			touch->dragging = 1;
-			MobileTouchGesture_Add(out, MOBILE_TOUCH_LEFT_DOWN, touch->start_x, touch->start_y, 1);
-		}
-		if (touch->left_down) {
-			MobileTouchGesture_Add(out, MOBILE_TOUCH_MOUSE_MOVE, x, y, 1);
-		}
+	if (!touch->left_down && !touch->secondary_active && MobileTouchGesture_MovedPastSlop(touch, x, y)) {
+		touch->left_down = 1;
+		touch->dragging = 1;
+		touch->tap_cancelled = 1;
+		MobileTouchGesture_Add(out, MOBILE_TOUCH_LEFT_DOWN, touch->start_x, touch->start_y, 1);
+	}
+	if (touch->left_down) {
+		MobileTouchGesture_Add(out, MOBILE_TOUCH_MOUSE_MOVE, x, y, 1);
 	}
 
 	touch->last_x = x;
