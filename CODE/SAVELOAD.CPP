@@ -1347,7 +1347,16 @@ bool Get_Savefile_Info(int id, char * buf, unsigned * scenp, HousesType * housep
 		return(false);
 	}
 
-	descr_buf[strlen(descr_buf) - 2] = '\0';	// trim off CR/LF
+	/*
+	**	A corrupt or foreign save file may fill the description with no NUL
+	**	terminator; don't let strlen() run off the buffer or the trim
+	**	underflow the index.
+	*/
+	descr_buf[DESCRIP_MAX - 1] = '\0';
+	size_t descr_len = strlen(descr_buf);
+	if (descr_len >= 2) {
+		descr_buf[descr_len - 2] = '\0';	// trim off CR/LF
+	}
 	strcpy(buf, descr_buf);
 
 	if (straw.Get(scenp, sizeof(unsigned)) != sizeof(unsigned)) {
