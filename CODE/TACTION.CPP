@@ -11,6 +11,38 @@
 #include	"function.h"
 
 /*
+**	Trigger action data authored by the original Watcom-built tools carries
+**	sign-extension garbage in its upper bytes. Under Watcom, enums were
+**	minimum-width (VoxType, HousesType, VQType, ThemeType, SpecialWeaponType,
+**	QuarryType one byte; VocType two bytes), and the mission editor saved the
+**	entire 32-bit Data.Value while the unused upper bytes still held 0xFF
+**	from the constructor's Data.Value = -1. Stock campaign INIs therefore
+**	contain values like -191 for speech 65 or -247 for house 9. The original
+**	engine re-read only the narrow union member, masking the garbage; modern
+**	compilers make every union member a full int, so the value read from the
+**	INI must be narrowed back to the width the data was authored with.
+*/
+static long Normalize_Action_Data(TActionType action, long value)
+{
+	switch (Action_Needs(action)) {
+		case NEED_THEME:
+		case NEED_MOVIE:
+		case NEED_SPEECH:
+		case NEED_HOUSE:
+		case NEED_SPECIAL:
+		case NEED_QUARRY:
+		case NEED_BOOL:
+			return((signed char)value);
+
+		case NEED_SOUND:
+			return((signed short)value);
+
+		default:
+			return(value);
+	}
+}
+
+/*
 **	These are the text names for the various actions. If the action name ends with "..." then
 **	this means that additional data is probably required.
 */
@@ -232,6 +264,7 @@ void TActionClass::Read_INI(void)
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
 	}
+	Data.Value = Normalize_Action_Data(Action, Data.Value);
 }
 
 
@@ -587,7 +620,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_BEGIN_PRODUCTION:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->Begin_Production();
+				if (specified_house != NULL) {
+					specified_house->Begin_Production();
+				}
 			}
 			break;
 
@@ -598,7 +633,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_FIRE_SALE:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->State = STATE_ENDGAME;
+				if (specified_house != NULL) {
+					specified_house->State = STATE_ENDGAME;
+				}
 			}
 			break;
 
@@ -608,7 +645,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_AUTOCREATE:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->IsAlerted = true;
+				if (specified_house != NULL) {
+					specified_house->IsAlerted = true;
+				}
 			}
 			break;
 
@@ -639,9 +678,13 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	Force all units of the house specified to go into
 		**	hunt mode.
 		*/
-		case TACTION_ALL_HUNT:
-			HouseClass::As_Pointer(Data.House)->Do_All_To_Hunt();
+		case TACTION_ALL_HUNT: {
+			HouseClass * hunt_house = HouseClass::As_Pointer(Data.House);
+			if (hunt_house != NULL) {
+				hunt_house->Do_All_To_Hunt();
+			}
 			break;
+		}
 
 		/*
 		**	This will destroy all objects that this trigger is
