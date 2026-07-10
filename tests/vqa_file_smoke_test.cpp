@@ -12,6 +12,11 @@ void MacSDL_Present8(unsigned char const *, int, int, int) {}
 void MacSDL_PumpEvents(void) {}
 bool MacSDL_QuitRequested(void) { return false; }
 void Flag_To_Set_Palette(unsigned char *, long, unsigned long) {}
+bool MacAudio_BeginMovieStream(int, int, int) { return true; }
+bool MacAudio_QueueMovieStream(void const *, size_t) { return true; }
+void MacAudio_ClearMovieStream(void) {}
+void MacAudio_SetMovieStreamPaused(bool) {}
+void MacAudio_EndMovieStream(void) {}
 
 static unsigned char FrameBuffer[320 * 200];
 static int FramesDrawn = 0;

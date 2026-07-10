@@ -15,6 +15,7 @@
 
 #include <mmsystem.h>
 
+#include "../include/mac_audio_stream.h"
 #include "../include/mac_sdl_runtime.h"
 
 extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsigned long length);
@@ -70,7 +71,7 @@ struct MacVQAADPCMChannel {
 };
 
 struct MacVQAState {
-	MacVQAState(void) : handle(0), handler(0), io_cookie(0), open(false), file_pos(0), form_end(0), palette_size(0), current_frame(0), stop_frame(0), partial_count(0), partial_compressed(false), audio_device(0), audio_open(false), audio_rate(0), audio_channels(0), audio_bits(0), next(0)
+	MacVQAState(void) : handle(0), handler(0), io_cookie(0), open(false), file_pos(0), form_end(0), palette_size(0), current_frame(0), stop_frame(0), partial_count(0), partial_compressed(false), audio_open(false), audio_rate(0), audio_channels(0), audio_bits(0), next(0)
 	{
 		memset(&config, 0, sizeof(config));
 		memset(&header, 0, sizeof(header));
@@ -96,7 +97,6 @@ struct MacVQAState {
 	long stop_frame;
 	long partial_count;
 	bool partial_compressed;
-	SDL_AudioDeviceID audio_device;
 	bool audio_open;
 	int audio_rate;
 	int audio_channels;
@@ -393,12 +393,10 @@ static bool vqa_audio_format(MacVQAState *state, int *rate, int *channels, int *
 
 static void vqa_close_audio(MacVQAState *state)
 {
-	if (!state || !state->audio_device) {
+	if (!state || !state->audio_open) {
 		return;
 	}
-	SDL_ClearQueuedAudio(state->audio_device);
-	SDL_CloseAudioDevice(state->audio_device);
-	state->audio_device = 0;
+	MacAudio_EndMovieStream();
 	state->audio_open = false;
 	state->audio_rate = 0;
 	state->audio_channels = 0;
@@ -420,31 +418,16 @@ static bool vqa_open_audio(MacVQAState *state)
 	if (!vqa_audio_format(state, &rate, &channels, &bits)) {
 		return false;
 	}
-	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
-		return false;
-	}
-
-	SDL_AudioSpec desired;
-	SDL_AudioSpec obtained;
-	memset(&desired, 0, sizeof(desired));
-	memset(&obtained, 0, sizeof(obtained));
-	desired.freq = rate;
-	desired.format = bits == 16 ? AUDIO_S16LSB : AUDIO_U8;
-	desired.channels = (Uint8)channels;
-	desired.samples = 2048;
-	desired.callback = 0;
-
-	state->audio_device = SDL_OpenAudioDevice(0, 0, &desired, &obtained, 0);
-	if (!state->audio_device) {
+	if (!MacAudio_BeginMovieStream(rate, channels, bits)) {
 		return false;
 	}
 
 	state->audio_open = true;
-	state->audio_rate = obtained.freq;
-	state->audio_channels = obtained.channels;
+	state->audio_rate = rate;
+	state->audio_channels = channels;
 	state->audio_bits = bits;
 	vqa_reset_adpcm(state);
-	SDL_PauseAudioDevice(state->audio_device, MacVQAAudioPaused ? 1 : 0);
+	MacAudio_SetMovieStreamPaused(MacVQAAudioPaused);
 	return true;
 }
 
@@ -531,10 +514,10 @@ static bool vqa_decode_snd2(MacVQAState *state, unsigned char const *source, uns
 
 static void vqa_queue_audio(MacVQAState *state, std::vector<unsigned char> const &decoded)
 {
-	if (!state || !state->audio_open || !state->audio_device || decoded.empty()) {
+	if (!state || !state->audio_open || decoded.empty()) {
 		return;
 	}
-	if (SDL_QueueAudio(state->audio_device, &decoded[0], (Uint32)decoded.size()) == 0) {
+	if (MacAudio_QueueMovieStream(&decoded[0], decoded.size())) {
 		state->stats.samples_played += (unsigned long)decoded.size();
 	}
 }
@@ -940,8 +923,8 @@ void VQA_Reset(VQAHandle *handle)
 	if (state) {
 		state->current_frame = 0;
 		vqa_reset_adpcm(state);
-		if (state->audio_device) {
-			SDL_ClearQueuedAudio(state->audio_device);
+		if (state->audio_open) {
+			MacAudio_ClearMovieStream();
 		}
 	}
 }
@@ -1165,8 +1148,8 @@ long VQA_SeekFrame(VQAHandle *handle, long frame, long fromwhere)
 	}
 	state->current_frame = target;
 	vqa_reset_adpcm(state);
-	if (state->audio_device) {
-		SDL_ClearQueuedAudio(state->audio_device);
+	if (state->audio_open) {
+		MacAudio_ClearMovieStream();
 	}
 	return VQAERR_NONE;
 }
@@ -1187,21 +1170,13 @@ long VQA_SetStop(VQAHandle *handle, long stop)
 void VQA_PauseAudio(void)
 {
 	MacVQAAudioPaused = true;
-	for (MacVQAState *state = MacVQAStates; state; state = state->next) {
-		if (state->audio_device) {
-			SDL_PauseAudioDevice(state->audio_device, 1);
-		}
-	}
+	MacAudio_SetMovieStreamPaused(true);
 }
 
 void VQA_ResumeAudio(void)
 {
 	MacVQAAudioPaused = false;
-	for (MacVQAState *state = MacVQAStates; state; state = state->next) {
-		if (state->audio_device) {
-			SDL_PauseAudioDevice(state->audio_device, 0);
-		}
-	}
+	MacAudio_SetMovieStreamPaused(false);
 }
 
 void VQA_GetInfo(VQAHandle *handle, VQAInfo *info)

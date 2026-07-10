@@ -33,6 +33,10 @@ static POINT MacMousePoint = {0, 0};
 static bool MacUnmodifiedKeyDispatch = false;
 
 #if defined(RA_MOBILE_TOUCH)
+extern bool InMovie;
+#endif
+
+#if defined(RA_MOBILE_TOUCH)
 static MobileTouchGesture MobileTouch;
 static MobilePanState MobilePan;
 static bool MobileTouchCursorHidden = true;
@@ -501,8 +505,10 @@ bool MacSDL_SetMode(int width, int height)
 		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 #endif
 		SDL_SetHint(SDL_HINT_RENDER_LOGICAL_SIZE_MODE, "letterbox");
-#if defined(RA_IOS)
+#if defined(RA_IOS) || defined(RA_ANDROID)
 		SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
+#if defined(RA_IOS)
 		SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "1");
 #endif
 #if defined(RA_MOBILE_TOUCH)
@@ -675,6 +681,11 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = 0;
 				int y = 0;
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
+				if (InMovie && MobileTouchGesture_IsTapEnd(&MobileTouch, (long long)event.tfinger.fingerId, x, y)) {
+					MobileTouchGesture_Init(&MobileTouch);
+					mac_queue_key_pulse(VK_ESCAPE);
+					break;
+				}
 				MobileTouchGestureOutput out;
 				MobileTouchGesture_End(&MobileTouch, (long long)event.tfinger.fingerId, x, y, &out);
 				mobile_queue_touch_output(&out);

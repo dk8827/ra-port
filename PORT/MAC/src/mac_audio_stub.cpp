@@ -8,6 +8,8 @@
 #include <string.h>
 #include <vector>
 
+#include "../include/mac_audio_stream.h"
+
 void (*Audio_Focus_Loss_Function)(void) = 0;
 
 extern SFX_Type SoundType;
@@ -39,12 +41,24 @@ struct PlayingSample {
 	int channels;
 };
 
+struct MovieStream {
+	bool active;
+	bool paused;
+	int rate;
+	int channels;
+	int bits;
+	unsigned long position;
+	unsigned long step;
+	std::vector<short> pcm;
+};
+
 static SDL_AudioDeviceID AudioDevice = 0;
 static int AudioRate = 22050;
 static int SoundVolume = 255;
 static int ScoreVolume = 255;
 static bool AudioReady = false;
 static PlayingSample Samples[kMaxSamples];
+static MovieStream MovieAudio;
 
 static int clamp_int(int value, int low, int high)
 {
@@ -92,6 +106,18 @@ static void reset_sample(PlayingSample &sample)
 	sample.pcm.clear();
 	sample.rate = 0;
 	sample.channels = 1;
+}
+
+static void reset_movie_stream()
+{
+	MovieAudio.active = false;
+	MovieAudio.paused = false;
+	MovieAudio.rate = 0;
+	MovieAudio.channels = 0;
+	MovieAudio.bits = 0;
+	MovieAudio.position = 0;
+	MovieAudio.step = 0;
+	MovieAudio.pcm.clear();
 }
 
 static void lock_audio()
@@ -391,6 +417,25 @@ static void mix_audio(void *, Uint8 *stream, int len)
 			sample.position += sample.step;
 		}
 	}
+
+	if (!MovieAudio.active || MovieAudio.paused || MovieAudio.pcm.empty() || MovieAudio.channels <= 0) {
+		return;
+	}
+
+	long movie_frames = (long)(MovieAudio.pcm.size() / (size_t)MovieAudio.channels);
+	for (int frame = 0; frame < frames; ++frame) {
+		long source_frame = (long)(MovieAudio.position >> 16);
+		if (source_frame >= movie_frames) {
+			break;
+		}
+
+		short left = MovieAudio.pcm[(size_t)source_frame * (size_t)MovieAudio.channels];
+		short right = MovieAudio.channels > 1 ? MovieAudio.pcm[(size_t)source_frame * (size_t)MovieAudio.channels + 1] : left;
+		int out_index = frame * 2;
+		out[out_index] = clamp_s16(out[out_index] + ((long long)left * SoundVolume) / 255LL);
+		out[out_index + 1] = clamp_s16(out[out_index + 1] + ((long long)right * SoundVolume) / 255LL);
+		MovieAudio.position += MovieAudio.step;
+	}
 }
 
 }
@@ -482,6 +527,7 @@ BOOL Audio_Init(HWND, int bits_per_sample, BOOL, int rate, int)
 	if (AudioReady) return TRUE;
 
 	for (int id = 0; id < kMaxSamples; ++id) reset_sample(Samples[id]);
+	reset_movie_stream();
 	SoundVolume = 255;
 	ScoreVolume = 255;
 
@@ -516,6 +562,7 @@ void Sound_End(void)
 	if (AudioDevice) {
 		SDL_LockAudioDevice(AudioDevice);
 		for (int id = 0; id < kMaxSamples; ++id) reset_sample(Samples[id]);
+		reset_movie_stream();
 		AudioReady = false;
 		SDL_UnlockAudioDevice(AudioDevice);
 		SDL_CloseAudioDevice(AudioDevice);
@@ -523,6 +570,73 @@ void Sound_End(void)
 	}
 	SoundType = SFX_NONE;
 	SampleType = SAMPLE_NONE;
+}
+
+bool MacAudio_BeginMovieStream(int rate, int channels, int bits)
+{
+	if (!AudioReady || !AudioDevice || rate <= 0 || (channels != 1 && channels != 2) || (bits != 8 && bits != 16)) {
+		return false;
+	}
+
+	lock_audio();
+	reset_movie_stream();
+	MovieAudio.active = true;
+	MovieAudio.rate = rate;
+	MovieAudio.channels = channels;
+	MovieAudio.bits = bits;
+	MovieAudio.step = (unsigned long)(((unsigned long long)rate << 16) / (unsigned long long)AudioRate);
+	if (MovieAudio.step == 0) MovieAudio.step = 1;
+	unlock_audio();
+	return true;
+}
+
+bool MacAudio_QueueMovieStream(void const *data, size_t bytes)
+{
+	if (!data || bytes == 0 || !AudioReady || !AudioDevice) {
+		return false;
+	}
+
+	lock_audio();
+	if (!MovieAudio.active) {
+		unlock_audio();
+		return false;
+	}
+
+	unsigned char const *source = (unsigned char const *)data;
+	if (MovieAudio.bits == 16) {
+		size_t samples = bytes / 2;
+		for (size_t index = 0; index < samples; ++index) {
+			MovieAudio.pcm.push_back((short)(int16_t)read_le16(source + index * 2));
+		}
+	} else {
+		for (size_t index = 0; index < bytes; ++index) {
+			MovieAudio.pcm.push_back((short)(((int)source[index] - 128) << 8));
+		}
+	}
+	unlock_audio();
+	return true;
+}
+
+void MacAudio_ClearMovieStream(void)
+{
+	lock_audio();
+	MovieAudio.pcm.clear();
+	MovieAudio.position = 0;
+	unlock_audio();
+}
+
+void MacAudio_SetMovieStreamPaused(bool paused)
+{
+	lock_audio();
+	MovieAudio.paused = paused;
+	unlock_audio();
+}
+
+void MacAudio_EndMovieStream(void)
+{
+	lock_audio();
+	reset_movie_stream();
+	unlock_audio();
 }
 
 void Stop_Sample(int handle)

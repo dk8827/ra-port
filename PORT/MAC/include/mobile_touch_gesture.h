@@ -183,6 +183,17 @@ static inline void MobileTouchGesture_Update(
 	touch->long_press_sent = 1;
 }
 
+static inline int MobileTouchGesture_IsTapEnd(
+	MobileTouchGesture const *touch,
+	long long finger,
+	int x,
+	int y)
+{
+	return touch && touch->primary_active && finger == touch->primary_finger &&
+		!touch->secondary_active && !touch->left_down && !touch->long_press_sent &&
+		!touch->tap_cancelled && !MobileTouchGesture_MovedPastSlop(touch, x, y);
+}
+
 static inline void MobileTouchGesture_End(
 	MobileTouchGesture *touch,
 	long long finger,
@@ -210,7 +221,7 @@ static inline void MobileTouchGesture_End(
 			MobileTouchGesture_Add(out, MOBILE_TOUCH_MOUSE_MOVE, x, y, 1);
 		}
 		MobileTouchGesture_Add(out, MOBILE_TOUCH_LEFT_UP, x, y, 0);
-	} else if (!touch->long_press_sent && !touch->tap_cancelled) {
+	} else if (MobileTouchGesture_IsTapEnd(touch, finger, x, y)) {
 		MobileTouchGesture_Add(out, MOBILE_TOUCH_LEFT_DOWN, x, y, 0);
 		MobileTouchGesture_Add(out, MOBILE_TOUCH_LEFT_UP, x, y, 0);
 	}

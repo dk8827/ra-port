@@ -21,6 +21,21 @@ static void test_tap_clicks_on_release(void)
 	assert(out.events[1].update_cursor == 0);
 }
 
+static void test_tap_end_detection_rejects_non_taps(void)
+{
+	MobileTouchGesture touch;
+	MobileTouchGestureOutput out;
+
+	MobileTouchGesture_Init(&touch);
+	MobileTouchGesture_Begin(&touch, 2, 100, 120, 1000, &out);
+	assert(MobileTouchGesture_IsTapEnd(&touch, 2, 103, 123));
+	assert(!MobileTouchGesture_IsTapEnd(&touch, 3, 103, 123));
+	assert(!MobileTouchGesture_IsTapEnd(&touch, 2, 120, 120));
+
+	MobileTouchGesture_Move(&touch, 2, 120, 120, &out);
+	assert(!MobileTouchGesture_IsTapEnd(&touch, 2, 120, 120));
+}
+
 static void test_drag_holds_left_button_after_slop(void)
 {
 	MobileTouchGesture touch;
@@ -150,6 +165,7 @@ static void test_two_finger_pan_cancels_tap(void)
 int main(void)
 {
 	test_tap_clicks_on_release();
+	test_tap_end_detection_rejects_non_taps();
 	test_drag_holds_left_button_after_slop();
 	test_two_finger_pan_releases_drag_without_lingering_cursor();
 	test_long_press_is_right_click();

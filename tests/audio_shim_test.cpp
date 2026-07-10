@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mac_audio_stream.h"
+
 int __cdecl Find_File(char const *)
 {
 	return 0;
@@ -46,6 +48,14 @@ int main()
 	if (offsetof(AUDHeaderType, Flags) != 10) fail("AUDHeaderType Flags offset changed");
 
 	if (!Audio_Init(0, 16, FALSE, 22050, 0)) fail("Audio_Init failed");
+
+	unsigned char movie_pcm[8] = {0x00, 0x80, 0x40, 0x80, 0x80, 0x80, 0xC0, 0x80};
+	if (!MacAudio_BeginMovieStream(22050, 1, 16)) fail("movie stream failed to use initialized audio device");
+	if (!MacAudio_QueueMovieStream(movie_pcm, sizeof(movie_pcm))) fail("movie PCM queue failed");
+	MacAudio_SetMovieStreamPaused(true);
+	MacAudio_SetMovieStreamPaused(false);
+	MacAudio_ClearMovieStream();
+	MacAudio_EndMovieStream();
 
 	enum { PayloadBytes = 4096 };
 	unsigned char sample[sizeof(AUDHeaderType) + PayloadBytes];
