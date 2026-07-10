@@ -11,6 +11,32 @@
 #include	"function.h"
 
 /*
+**	Mission INI trigger data was authored with Watcom minimum-width enums
+**	(one byte for most types, two for VocType), and the editor saved the
+**	whole 32-bit Data.Value with 0xFF filler in the unused upper bytes
+**	(e.g. -191 encodes speech 65). Narrow the value to its authored width.
+*/
+static long Normalize_Action_Data(TActionType action, long value)
+{
+	switch (Action_Needs(action)) {
+		case NEED_THEME:
+		case NEED_MOVIE:
+		case NEED_SPEECH:
+		case NEED_HOUSE:
+		case NEED_SPECIAL:
+		case NEED_QUARRY:
+		case NEED_BOOL:
+			return((signed char)value);
+
+		case NEED_SOUND:
+			return((signed short)value);
+
+		default:
+			return(value);
+	}
+}
+
+/*
 **	These are the text names for the various actions. If the action name ends with "..." then
 **	this means that additional data is probably required.
 */
@@ -232,6 +258,7 @@ void TActionClass::Read_INI(void)
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
 	}
+	Data.Value = Normalize_Action_Data(Action, Data.Value);
 }
 
 
@@ -851,4 +878,3 @@ NeedType Action_Needs(TActionType action)
 	}
 	return(NEED_NONE);
 }
-

@@ -333,6 +333,12 @@ grep -F "Scen.ScenarioName[2] != 'U' && Scen.ScenarioName[2] != 'G'" "$ROOT_DIR/
 perl -0ne 'exit(/Session\.Type == GAME_SKIRMISH[\s\S]{0,120}Session\.Type = GAME_NORMAL[\s\S]{0,120}selection = SEL_NONE/s ? 0 : 1)' "$ROOT_DIR/CODE/INIT.CPP" \
   || fail "returning from skirmish must reset to the main menu instead of auto-starting skirmish"
 
+perl -0ne 'exit(/static long Normalize_Action_Data\(TActionType action, long value\)[\s\S]*Action_Needs\(action\)[\s\S]*case NEED_THEME:[\s\S]*case NEED_MOVIE:[\s\S]*case NEED_SPEECH:[\s\S]*case NEED_HOUSE:[\s\S]*case NEED_SPECIAL:[\s\S]*case NEED_QUARRY:[\s\S]*case NEED_BOOL:[\s\S]*return\(\(signed char\)value\);[\s\S]*case NEED_SOUND:[\s\S]*return\(\(signed short\)value\);/s ? 0 : 1)' "$ROOT_DIR/CODE/TACTION.CPP" \
+  || fail "trigger actions must restore legacy enum payloads to their serialized widths"
+
+perl -0ne 'exit(/void TActionClass::Read_INI\(void\)[\s\S]*switch \(NewINIFormat\)[\s\S]*Data\.Value = atoi\(strtok\(NULL, ","\)\);[\s\S]*case 1:[\s\S]*case 0:[\s\S]*Data\.Value = atoi\(strtok\(NULL, ","\)\);[\s\S]*\}[\s\S]*Data\.Value = Normalize_Action_Data\(Action, Data\.Value\);/s ? 0 : 1)' "$ROOT_DIR/CODE/TACTION.CPP" \
+  || fail "trigger actions must normalize legacy values after every INI format is parsed"
+
 perl -0ne 'exit(/static\s+void\s+\*\s+operator new\s*\(\s*size_t\s+size\s*\)\s*throw\s*\(\s*\)\s*;/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.H" \
   || fail "AnimClass pool allocation must be declared non-throwing so exhausted pools return NULL instead of constructing at address zero"
 
