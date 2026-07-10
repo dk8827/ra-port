@@ -333,6 +333,12 @@ grep -F "Scen.ScenarioName[2] != 'U' && Scen.ScenarioName[2] != 'G'" "$ROOT_DIR/
 perl -0ne 'exit(/Session\.Type == GAME_SKIRMISH[\s\S]{0,120}Session\.Type = GAME_NORMAL[\s\S]{0,120}selection = SEL_NONE/s ? 0 : 1)' "$ROOT_DIR/CODE/INIT.CPP" \
   || fail "returning from skirmish must reset to the main menu instead of auto-starting skirmish"
 
+perl -0ne 'exit(/void Speak\(VoxType voice\)\s*\{\s*if \(voice < VOX_FIRST \|\| voice >= VOX_COUNT\) return;/s ? 0 : 1)' "$ROOT_DIR/CODE/AUDIO.CPP" \
+  || fail "Speak must reject invalid EVA speech identifiers before queueing them"
+
+perl -0ne 'exit(/void Speak_AI\(void\)[\s\S]*CurrentVoice = VOX_NONE;[\s\S]*if \(SpeakQueue < VOX_FIRST \|\| SpeakQueue >= VOX_COUNT\) \{\s*SpeakQueue = VOX_NONE;\s*\}[\s\S]*if \(SpeakQueue != VOX_NONE\)/s ? 0 : 1)' "$ROOT_DIR/CODE/AUDIO.CPP" \
+  || fail "Speak_AI must clear invalid queued EVA speech before indexing the speech table"
+
 perl -0ne 'exit(/static\s+void\s+\*\s+operator new\s*\(\s*size_t\s+size\s*\)\s*throw\s*\(\s*\)\s*;/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.H" \
   || fail "AnimClass pool allocation must be declared non-throwing so exhausted pools return NULL instead of constructing at address zero"
 
