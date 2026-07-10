@@ -1348,9 +1348,7 @@ bool Get_Savefile_Info(int id, char * buf, unsigned * scenp, HousesType * housep
 	}
 
 	/*
-	**	A corrupt or foreign save file may fill the description with no NUL
-	**	terminator; don't let strlen() run off the buffer or the trim
-	**	underflow the index.
+	**	The description field is not guaranteed to be NUL terminated.
 	*/
 	descr_buf[DESCRIP_MAX - 1] = '\0';
 	size_t descr_len = strlen(descr_buf);

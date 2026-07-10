@@ -606,8 +606,6 @@ char const * Speech_Name(VoxType speech)
  *=============================================================================================*/
 void Speak(VoxType voice)
 {
-	// Scenario trigger data can carry an out-of-range speech id; indexing
-	// Speech[] with it reads past the table and crashes. Ignore such ids.
 	if (voice < VOX_FIRST || voice >= VOX_COUNT) return;
 	if (!Debug_Quiet && Options.Volume != 0 && SampleType != 0 && voice != VOX_NONE && voice != SpeakQueue && voice != CurrentVoice && SpeakQueue == VOX_NONE) {
 		SpeakQueue = voice;

@@ -779,9 +779,7 @@ bool FootClass::Follow_Edge(CELL start, CELL target, PathType * path, FacingType
 	**	or run out of moves.
 	*/
 	/*
-	**	Reserve one slot for the trailing END command; the success case below
-	**	writes Command[path->Length] after Register_Cell has already grown
-	**	Length, so allowing Length to reach max_cells overruns the buffer.
+	**	One slot stays reserved for the trailing END command.
 	*/
 	while (path->Length < max_cells - 1) {
 

@@ -11,16 +11,10 @@
 #include	"function.h"
 
 /*
-**	Trigger action data authored by the original Watcom-built tools carries
-**	sign-extension garbage in its upper bytes. Under Watcom, enums were
-**	minimum-width (VoxType, HousesType, VQType, ThemeType, SpecialWeaponType,
-**	QuarryType one byte; VocType two bytes), and the mission editor saved the
-**	entire 32-bit Data.Value while the unused upper bytes still held 0xFF
-**	from the constructor's Data.Value = -1. Stock campaign INIs therefore
-**	contain values like -191 for speech 65 or -247 for house 9. The original
-**	engine re-read only the narrow union member, masking the garbage; modern
-**	compilers make every union member a full int, so the value read from the
-**	INI must be narrowed back to the width the data was authored with.
+**	Mission INI trigger data was authored with Watcom minimum-width enums
+**	(one byte for most types, two for VocType), and the editor saved the
+**	whole 32-bit Data.Value with 0xFF filler in the unused upper bytes
+**	(e.g. -191 encodes speech 65). Narrow the value to its authored width.
 */
 static long Normalize_Action_Data(TActionType action, long value)
 {

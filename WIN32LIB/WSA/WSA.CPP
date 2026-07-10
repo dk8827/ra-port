@@ -73,8 +73,7 @@ typedef struct {
 // NOTE:  The 'total_frames' field is used to differentiate between Amiga and IBM
 // animations.  Amiga animations have the HIGH bit set.
 //
-// The on-disk header uses 4-byte offsets and no padding; keep the struct
-// byte-packed with fixed-width fields so it matches on LP64 platforms.
+// Byte-packed to match the on-disk layout.
 #pragma pack(push, 1)
 typedef struct {
 	unsigned short total_frames;
@@ -203,10 +202,8 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 	// NOTE:"THIS IS A BAD THING. SINCE sizeof(SysAnimHeaderType) CHANGED, THE ANIMATE.EXE
 	// UTILITY DID NOT KNOW I UPDATED IT, IT ADDS IT TO largest_frame_size BEFORE SAVING
 	// IT TO THE FILE.  THIS MEANS I HAVE TO ADD THESE charS ON NOW FOR IT TO WORK.
-	// On 64-bit, SysAnimHeaderType grew (pointers/padding), so the original
-	// EXTRA_charS compensation under-sizes the delta region. Reserve the full
-	// current header size instead; the file's largest_frame_size already
-	// includes the historical 32-bit header slack, so this only over-allocates.
+	// Reserving the full current header size keeps the delta region large
+	// enough regardless of pointer width.
 	delta_buffer_size  = (unsigned long) file_header.largest_frame_size + sizeof(SysAnimHeaderType);
 	min_buffer_size = target_buffer_size + delta_buffer_size;
 	max_buffer_size = min_buffer_size + file_buffer_size;
