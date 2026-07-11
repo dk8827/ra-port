@@ -10,6 +10,7 @@
 
 #include	"function.h"
 #include	"trigtype.h"
+#include	"triggerwidth.h"
 
 
 /***********************************************************************************************
@@ -1898,7 +1899,7 @@ void TriggerTypeClass::Fill_In(char * name, char * entry)
 	Set_Name(name);
 
 	IsPersistant = PersistantType(atoi(strtok(entry, ",")));
-	House = (HousesType)((signed char)atoi(strtok(NULL, ",")));
+	House = (HousesType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 	EventControl = MultiStyleType(atoi(strtok(NULL, ",")));
 	ActionControl = MultiStyleType(atoi(strtok(NULL, ",")));
 

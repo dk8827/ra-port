@@ -336,6 +336,10 @@ perl -0ne 'exit(/Session\.Type == GAME_SKIRMISH[\s\S]{0,120}Session\.Type = GAME
 perl -0ne 'exit(/static\s+void\s+\*\s+operator new\s*\(\s*size_t\s+size\s*\)\s*throw\s*\(\s*\)\s*;/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.H" \
   || fail "AnimClass pool allocation must be declared non-throwing so exhausted pools return NULL instead of constructing at address zero"
 
+assert_file_contains CODE/TACTION.CPP "Normalize_Trigger_Data(Action_Needs(Action), Data.Value)"
+assert_file_contains CODE/TEVENT.CPP "Normalize_Trigger_Data(Event_Needs(Event), Data.Value)"
+assert_file_contains CODE/TRIGTYPE.CPP "Legacy_Trigger_Byte(atoi(strtok(NULL, \",\")))"
+
 perl -0ne 'exit(/void\s+\*\s+AnimClass::operator new\s*\(\s*size_t\s*\)\s*throw\s*\(\s*\)/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.CPP" \
   || fail "AnimClass pool allocation definition must be non-throwing so exhausted pools return NULL instead of constructing at address zero"
 

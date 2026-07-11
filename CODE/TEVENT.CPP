@@ -9,32 +9,7 @@
  */
 
 #include	"function.h"
-
-/*
-**	Mission INI trigger data was authored with Watcom minimum-width enums
-**	(one byte for most types, two for VocType), and the editor saved the
-**	whole 32-bit Data.Value with 0xFF filler in the unused upper bytes.
-**	Narrow the value to its authored width (same rules as TActionClass).
-*/
-static long Normalize_Event_Data(TEventType event, long value)
-{
-	switch (Event_Needs(event)) {
-		case NEED_THEME:
-		case NEED_MOVIE:
-		case NEED_SPEECH:
-		case NEED_HOUSE:
-		case NEED_SPECIAL:
-		case NEED_QUARRY:
-		case NEED_BOOL:
-			return((signed char)value);
-
-		case NEED_SOUND:
-			return((signed short)value);
-
-		default:
-			return(value);
-	}
-}
+#include	"triggerwidth.h"
 
 /*
 **	This is the text name for all of the trigger events. These are used by the scenario editor
@@ -210,9 +185,9 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 {
 	/*
 	**	Mission INI stores event types in a one-byte field; narrow so comparisons
-	**	match original Watcom enum width (see Normalize_Event_Data).
+	**	match original Watcom enum width (see Normalize_Trigger_Data).
 	*/
-	TEventType const Type = (TEventType)((signed char)Event);
+	TEventType const Type = (TEventType)Legacy_Trigger_Byte(Event);
 
 	/*
 	**	If this trigger event has been forced, then no further checks are required.
@@ -516,7 +491,7 @@ void TEventClass::Read_INI(void)
 	char const * token;
 	switch (NewINIFormat) {
 		default:
-			Event = (TEventType)((signed char)atoi(strtok(NULL, ",")));
+			Event = (TEventType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 			Team.Set_Raw(atoi(strtok(NULL, ",")));
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
@@ -524,7 +499,7 @@ void TEventClass::Read_INI(void)
 		case 1:
 			token = strtok(NULL, ",");
 			Event = TEVENT_NONE;
-			if (token) Event = (TEventType)((signed char)atoi(token));
+			if (token) Event = (TEventType)Legacy_Trigger_Byte(atoi(token));
 
 			token = strtok(NULL, ",");
 			Team = NULL;
@@ -539,7 +514,7 @@ void TEventClass::Read_INI(void)
 			break;
 
 		case 0:
-			Event = (TEventType)((signed char)atoi(strtok(NULL, ",")));
+			Event = (TEventType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 
 			strtok(NULL, ",");
 			strtok(NULL, ",");
@@ -549,7 +524,7 @@ void TEventClass::Read_INI(void)
 			strtok(NULL, ",");
 			break;
 	}
-	Data.Value = Normalize_Event_Data(Event, Data.Value);
+	Data.Value = Normalize_Trigger_Data(Event_Needs(Event), Data.Value);
 }
 
 

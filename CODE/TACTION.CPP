@@ -9,38 +9,7 @@
  */
 
 #include	"function.h"
-
-/*
-**	Trigger action data authored by the original Watcom-built tools carries
-**	sign-extension garbage in its upper bytes. Under Watcom, enums were
-**	minimum-width (VoxType, HousesType, VQType, ThemeType, SpecialWeaponType,
-**	QuarryType one byte; VocType two bytes), and the mission editor saved the
-**	entire 32-bit Data.Value while the unused upper bytes still held 0xFF
-**	from the constructor's Data.Value = -1. Stock campaign INIs therefore
-**	contain values like -191 for speech 65 or -247 for house 9. The original
-**	engine re-read only the narrow union member, masking the garbage; modern
-**	compilers make every union member a full int, so the value read from the
-**	INI must be narrowed back to the width the data was authored with.
-*/
-static long Normalize_Action_Data(TActionType action, long value)
-{
-	switch (Action_Needs(action)) {
-		case NEED_THEME:
-		case NEED_MOVIE:
-		case NEED_SPEECH:
-		case NEED_HOUSE:
-		case NEED_SPECIAL:
-		case NEED_QUARRY:
-		case NEED_BOOL:
-			return((signed char)value);
-
-		case NEED_SOUND:
-			return((signed short)value);
-
-		default:
-			return(value);
-	}
-}
+#include	"triggerwidth.h"
 
 /*
 **	These are the text names for the various actions. If the action name ends with "..." then
@@ -241,7 +210,7 @@ void TActionClass::Read_INI(void)
 {
 	switch (NewINIFormat) {
 		default:
-			Action = (TActionType)((signed char)atoi(strtok(NULL, ",")));
+			Action = (TActionType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 			Team.Set_Raw(atoi(strtok(NULL, ",")));
 			Trigger.Set_Raw(atoi(strtok(NULL, ",")));
 			Data.Value = atoi(strtok(NULL, ","));
@@ -249,7 +218,7 @@ void TActionClass::Read_INI(void)
 
 		case 1:
 		case 0:
-			Action = (TActionType)((signed char)atoi(strtok(NULL, ",")));
+			Action = (TActionType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 
 			char const * ptr = strtok(NULL, ",");
 			Team = TeamTypeClass::From_Name(ptr);
@@ -264,7 +233,7 @@ void TActionClass::Read_INI(void)
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
 	}
-	Data.Value = Normalize_Action_Data(Action, Data.Value);
+	Data.Value = Normalize_Trigger_Data(Action_Needs(Action), Data.Value);
 }
 
 
@@ -340,10 +309,10 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 {
 	/*
 	**	Mission INI stores action types in a one-byte field; narrow at use time
-	**	(see Normalize_Action_Data).
+	**	(see Normalize_Trigger_Data).
 	*/
-	TActionType const Type = (TActionType)((signed char)Action);
-	HousesType const action_house = (HousesType)((signed char)Data.Value);
+	TActionType const Type = (TActionType)Legacy_Trigger_Byte(Action);
+	HousesType const action_house = (HousesType)Legacy_Trigger_Byte(Data.Value);
 
 	/*
 	**	Otherwise, take an appropriate action.
@@ -901,4 +870,3 @@ NeedType Action_Needs(TActionType action)
 	}
 	return(NEED_NONE);
 }
-
