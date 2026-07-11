@@ -340,6 +340,9 @@ assert_file_contains CODE/TACTION.CPP "Normalize_Trigger_Data(Action_Needs(Actio
 assert_file_contains CODE/TEVENT.CPP "Normalize_Trigger_Data(Event_Needs(Event), Data.Value)"
 assert_file_contains CODE/TRIGTYPE.CPP "Legacy_Trigger_Byte(atoi(strtok(NULL, \",\")))"
 
+perl -0ne 'exit(/class BuildingClass[\s\S]*operator new\s*\(\s*size_t size\s*\)\s*throw\s*\(\s*\)/s ? 0 : 1)' "$ROOT_DIR/CODE/BUILDING.H" \
+  || fail "BuildingClass pool allocation must be non-throwing"
+
 perl -0ne 'exit(/void\s+\*\s+AnimClass::operator new\s*\(\s*size_t\s*\)\s*throw\s*\(\s*\)/s ? 0 : 1)' "$ROOT_DIR/CODE/ANIM.CPP" \
   || fail "AnimClass pool allocation definition must be non-throwing so exhausted pools return NULL instead of constructing at address zero"
 
@@ -365,6 +368,10 @@ trap 'rm -rf "$tmpdir"' EXIT
 "${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/CODE" \
   "$ROOT_DIR/tests/trigger_width_test.cpp" -o "$tmpdir/trigger_width_test"
 "$tmpdir/trigger_width_test"
+
+"${CXX:-c++}" -std=gnu++98 \
+  "$ROOT_DIR/tests/operator_new_null_test.cpp" -o "$tmpdir/operator_new_null_test"
+"$tmpdir/operator_new_null_test"
 
 "${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
   "$ROOT_DIR/tests/aspect_viewport_test.cpp" -o "$tmpdir/aspect_viewport_test"
