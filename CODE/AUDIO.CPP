@@ -651,7 +651,11 @@ void Speak_AI(void)
 			*/
 			void const * speech = NULL;
 			for (int index = 0; index < ARRAY_SIZE(SpeechRecord); index++) {
-				if (SpeechRecord[index] == SpeakQueue) break;
+				if (SpeechRecord[index] == SpeakQueue) {
+					speech = SpeechBuffer[index];
+					_index = index;
+					break;
+				}
 			}
 
 			/*
