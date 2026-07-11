@@ -560,6 +560,7 @@ BOOL Audio_Init(HWND, int bits_per_sample, BOOL, int rate, int)
 void Sound_End(void)
 {
 	if (AudioDevice) {
+		SDL_PauseAudioDevice(AudioDevice, 1);
 		SDL_LockAudioDevice(AudioDevice);
 		for (int id = 0; id < kMaxSamples; ++id) reset_sample(Samples[id]);
 		reset_movie_stream();

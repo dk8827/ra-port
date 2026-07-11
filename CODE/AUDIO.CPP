@@ -703,7 +703,10 @@ void Speak_AI(void)
 void Stop_Speaking(void)
 {
 	SpeakQueue = VOX_NONE;
-	Stop_Sample_Playing(SpeechBuffer);
+	CurrentVoice = VOX_NONE;
+	for (int index = 0; index < ARRAY_SIZE(SpeechBuffer); index++) {
+		Stop_Sample_Playing(SpeechBuffer[index]);
+	}
 }
 
 
@@ -726,8 +729,16 @@ void Stop_Speaking(void)
 bool Is_Speaking(void)
 {
 	Speak_AI();
-	if (!Debug_Quiet && SampleType != 0 && (SpeakQueue != VOX_NONE || Is_Sample_Playing(SpeechBuffer))) {
+	if (Debug_Quiet || SampleType == 0) {
+		return(false);
+	}
+	if (SpeakQueue != VOX_NONE) {
 		return(true);
+	}
+	for (int index = 0; index < ARRAY_SIZE(SpeechBuffer); index++) {
+		if (Is_Sample_Playing(SpeechBuffer[index])) {
+			return(true);
+		}
 	}
 	return(false);
 }

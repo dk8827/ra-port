@@ -418,7 +418,7 @@ void Do_Vortex (int x, int y, int frame);
 ** Win32 specific externs
 */
 #ifdef WIN32
-extern bool ReadyToQuit;							//Are we about to exit cleanly
+extern int ReadyToQuit;							//Are we about to exit cleanly (0=running, 1=clean, 2=done, 3=emergency)
 extern bool InDebugger;							//Are we being run from a debugger
 void Memory_Error_Handler(void);				//Memory error handler function
 void WWDebugString (char *string);
