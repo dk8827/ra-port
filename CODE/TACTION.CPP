@@ -241,7 +241,7 @@ void TActionClass::Read_INI(void)
 {
 	switch (NewINIFormat) {
 		default:
-			Action = TActionType(atoi(strtok(NULL, ",")));
+			Action = (TActionType)((signed char)atoi(strtok(NULL, ",")));
 			Team.Set_Raw(atoi(strtok(NULL, ",")));
 			Trigger.Set_Raw(atoi(strtok(NULL, ",")));
 			Data.Value = atoi(strtok(NULL, ","));
@@ -249,7 +249,7 @@ void TActionClass::Read_INI(void)
 
 		case 1:
 		case 0:
-			Action = TActionType(atoi(strtok(NULL, ",")));
+			Action = (TActionType)((signed char)atoi(strtok(NULL, ",")));
 
 			char const * ptr = strtok(NULL, ",");
 			Team = TeamTypeClass::From_Name(ptr);
@@ -339,8 +339,15 @@ void TActionClass::Decode_Pointers(void)
 bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, CELL cell)
 {
 	/*
-	**	Otherwise, take an appropriate action.
+	**	Mission INI stores action types in a one-byte field; narrow at use time
+	**	(see Normalize_Action_Data).
 	*/
+	TActionType const Type = (TActionType)((signed char)Action);
+	HousesType const action_house = (HousesType)((signed char)Data.Value);
+
+	/*
+	**	Otherwise, take an appropriate action.
+	 */
 	HouseClass * hptr = HouseClass::As_Pointer(house);
 	TriggerClass * trig = NULL;
 	if (id != -1) {
@@ -358,7 +365,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		object = 0;
 	}
 
-	switch (Action) {
+	switch (Type) {
 		/*
 		**	Display a text message overlayed onto the tactical map.
 		*/
@@ -595,7 +602,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	is only used to determine if it is the player or the computer.
 		*/
 		case TACTION_WIN:
-			if (Data.House == PlayerPtr->Class->House) {
+			if (action_house == PlayerPtr->Class->House) {
 				PlayerPtr->Flag_To_Win();
 			} else {
 				PlayerPtr->Flag_To_Lose();
@@ -607,7 +614,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	used to determine if it refers to the player or the computer.
 		*/
 		case TACTION_LOSE:
-			if (Data.House != PlayerPtr->Class->House) {
+			if (action_house != PlayerPtr->Class->House) {
 				PlayerPtr->Flag_To_Win();
 			} else {
 				PlayerPtr->Flag_To_Lose();
