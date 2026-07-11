@@ -358,6 +358,10 @@ trap 'rm -rf "$tmpdir"' EXIT
   "$ROOT_DIR/tests/fixed_endian_test.cpp" "$ROOT_DIR/CODE/FIXED.CPP" -o "$tmpdir/fixed_endian_test"
 "$tmpdir/fixed_endian_test"
 
+"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/CODE" \
+  "$ROOT_DIR/tests/trigger_width_test.cpp" -o "$tmpdir/trigger_width_test"
+"$tmpdir/trigger_width_test"
+
 "${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
   "$ROOT_DIR/tests/aspect_viewport_test.cpp" -o "$tmpdir/aspect_viewport_test"
 "$tmpdir/aspect_viewport_test"
