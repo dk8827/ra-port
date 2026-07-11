@@ -1898,7 +1898,7 @@ void TriggerTypeClass::Fill_In(char * name, char * entry)
 	Set_Name(name);
 
 	IsPersistant = PersistantType(atoi(strtok(entry, ",")));
-	House = HousesType(atoi(strtok(NULL, ",")));
+	House = (HousesType)((signed char)atoi(strtok(NULL, ",")));
 	EventControl = MultiStyleType(atoi(strtok(NULL, ",")));
 	ActionControl = MultiStyleType(atoi(strtok(NULL, ",")));
 
