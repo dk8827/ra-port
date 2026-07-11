@@ -43,16 +43,24 @@ git add .gitignore
 git commit -m "chore: ignore local worktrees"
 ```
 
-- [ ] **Step 3: Return the primary checkout to `main` and create the isolated branch**
+- [ ] **Step 3: Verify the ignore rule and create the isolated branch**
 
 ```bash
-git switch main
+git check-ignore -q .worktrees
 git worktree add .worktrees/lp64-pr-integration -b fix/lp64-pr-integration spec/lp64-pr-integration
 ```
 
 Expected: `.worktrees/lp64-pr-integration` is on `fix/lp64-pr-integration` and includes the design, plan, and `.gitignore` commits.
 
-- [ ] **Step 4: Fetch and pin contributor heads**
+- [ ] **Step 4: Return the primary checkout to `main`**
+
+```bash
+git switch main
+```
+
+Expected: the primary checkout is clean on `main`; all implementation work occurs in `.worktrees/lp64-pr-integration`.
+
+- [ ] **Step 5: Fetch and pin contributor heads**
 
 ```bash
 git fetch origin pull/2/head:refs/remotes/origin/pr-2 pull/5/head:refs/remotes/origin/pr-5
@@ -66,7 +74,7 @@ Expected SHAs:
 30f6885f91d6a535c78119f8387553bb0def9315
 ```
 
-- [ ] **Step 5: Verify the baseline**
+- [ ] **Step 6: Verify the baseline**
 
 ```bash
 tests/run_script_tests.sh
