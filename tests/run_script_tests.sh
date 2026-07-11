@@ -340,6 +340,13 @@ assert_file_contains CODE/TACTION.CPP "Normalize_Trigger_Data(Action_Needs(Actio
 assert_file_contains CODE/TEVENT.CPP "Normalize_Trigger_Data(Event_Needs(Event), Data.Value)"
 assert_file_contains CODE/TRIGTYPE.CPP "Legacy_Trigger_Byte(atoi(strtok(NULL, \",\")))"
 
+assert_file_contains CODE/AUDIO.CPP "if (voice < VOX_FIRST || voice >= VOX_COUNT) return;"
+assert_file_contains CODE/FINDPATH.CPP "while (path->Length < max_cells - 1)"
+assert_file_contains CODE/SIDEBAR.CPP "memset(&pal[CYCLE_COLOR_START], 0x3f, CYCLE_COLOR_COUNT * sizeof(RGBClass))"
+assert_file_contains CODE/SIDEBAR.CPP "if (BuildableCount < MAX_BUILDABLES)"
+assert_file_contains CODE/CELL.CPP ">= MAP_CELL_TOTAL"
+assert_file_contains CODE/SAVELOAD.CPP "Normalize_Save_Description(descr_buf, DESCRIP_MAX)"
+
 perl -0ne 'exit(/class BuildingClass[\s\S]*operator new\s*\(\s*size_t size\s*\)\s*throw\s*\(\s*\)/s ? 0 : 1)' "$ROOT_DIR/CODE/BUILDING.H" \
   || fail "BuildingClass pool allocation must be non-throwing"
 
@@ -372,6 +379,10 @@ trap 'rm -rf "$tmpdir"' EXIT
 "${CXX:-c++}" -std=gnu++98 \
   "$ROOT_DIR/tests/operator_new_null_test.cpp" -o "$tmpdir/operator_new_null_test"
 "$tmpdir/operator_new_null_test"
+
+"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/CODE" \
+  "$ROOT_DIR/tests/save_description_test.cpp" -o "$tmpdir/save_description_test"
+"$tmpdir/save_description_test"
 
 "${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
   "$ROOT_DIR/tests/aspect_viewport_test.cpp" -o "$tmpdir/aspect_viewport_test"
