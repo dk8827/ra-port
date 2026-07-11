@@ -93,7 +93,7 @@ void Recoil_Adjust(DirType dir, int &x, int &y)
  *   04/11/1994 JLB : Created.                                                                 *
  *   04/21/1994 JLB : Converted to operator new.                                               *
  *=============================================================================================*/
-void * UnitClass::operator new(size_t)
+void * UnitClass::operator new(size_t) throw()
 {
 	void * ptr = Units.Alloc();
 	if (ptr != NULL) {

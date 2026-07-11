@@ -30,7 +30,7 @@ class AircraftClass : public FootClass, public FlyClass
 		CCPtr<AircraftTypeClass> Class;
 
 		//-----------------------------------------------------------------------------
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t, void * ptr) {return(ptr);};
 		static void operator delete(void *);
 		operator AircraftType(void) const {return Class->Type;};

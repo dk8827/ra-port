@@ -9,6 +9,7 @@
  */
 
 #include	"function.h"
+#include	"triggerwidth.h"
 
 /*
 **	These are the text names for the various actions. If the action name ends with "..." then
@@ -209,7 +210,7 @@ void TActionClass::Read_INI(void)
 {
 	switch (NewINIFormat) {
 		default:
-			Action = TActionType(atoi(strtok(NULL, ",")));
+			Action = (TActionType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 			Team.Set_Raw(atoi(strtok(NULL, ",")));
 			Trigger.Set_Raw(atoi(strtok(NULL, ",")));
 			Data.Value = atoi(strtok(NULL, ","));
@@ -217,7 +218,7 @@ void TActionClass::Read_INI(void)
 
 		case 1:
 		case 0:
-			Action = TActionType(atoi(strtok(NULL, ",")));
+			Action = (TActionType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 
 			char const * ptr = strtok(NULL, ",");
 			Team = TeamTypeClass::From_Name(ptr);
@@ -232,6 +233,7 @@ void TActionClass::Read_INI(void)
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
 	}
+	Data.Value = Normalize_Trigger_Data(Action_Needs(Action), Data.Value);
 }
 
 
@@ -306,8 +308,15 @@ void TActionClass::Decode_Pointers(void)
 bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, CELL cell)
 {
 	/*
-	**	Otherwise, take an appropriate action.
+	**	Mission INI stores action types in a one-byte field; narrow at use time
+	**	(see Normalize_Trigger_Data).
 	*/
+	TActionType const Type = (TActionType)Legacy_Trigger_Byte(Action);
+	HousesType const action_house = (HousesType)Legacy_Trigger_Byte(Data.Value);
+
+	/*
+	**	Otherwise, take an appropriate action.
+	 */
 	HouseClass * hptr = HouseClass::As_Pointer(house);
 	TriggerClass * trig = NULL;
 	if (id != -1) {
@@ -325,7 +334,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		object = 0;
 	}
 
-	switch (Action) {
+	switch (Type) {
 		/*
 		**	Display a text message overlayed onto the tactical map.
 		*/
@@ -562,7 +571,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	is only used to determine if it is the player or the computer.
 		*/
 		case TACTION_WIN:
-			if (Data.House == PlayerPtr->Class->House) {
+			if (action_house == PlayerPtr->Class->House) {
 				PlayerPtr->Flag_To_Win();
 			} else {
 				PlayerPtr->Flag_To_Lose();
@@ -574,7 +583,7 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	used to determine if it refers to the player or the computer.
 		*/
 		case TACTION_LOSE:
-			if (Data.House != PlayerPtr->Class->House) {
+			if (action_house != PlayerPtr->Class->House) {
 				PlayerPtr->Flag_To_Win();
 			} else {
 				PlayerPtr->Flag_To_Lose();
@@ -587,7 +596,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_BEGIN_PRODUCTION:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->Begin_Production();
+				if (specified_house != NULL) {
+					specified_house->Begin_Production();
+				}
 			}
 			break;
 
@@ -598,7 +609,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_FIRE_SALE:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->State = STATE_ENDGAME;
+				if (specified_house != NULL) {
+					specified_house->State = STATE_ENDGAME;
+				}
 			}
 			break;
 
@@ -608,7 +621,9 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		case TACTION_AUTOCREATE:
 			if (Data.House != HOUSE_NONE) {
 				HouseClass * specified_house = HouseClass::As_Pointer(Data.House);
-				specified_house->IsAlerted = true;
+				if (specified_house != NULL) {
+					specified_house->IsAlerted = true;
+				}
 			}
 			break;
 
@@ -639,9 +654,13 @@ bool TActionClass::operator() (HousesType house, ObjectClass * object, int id, C
 		**	Force all units of the house specified to go into
 		**	hunt mode.
 		*/
-		case TACTION_ALL_HUNT:
-			HouseClass::As_Pointer(Data.House)->Do_All_To_Hunt();
+		case TACTION_ALL_HUNT: {
+			HouseClass * hunt_house = HouseClass::As_Pointer(Data.House);
+			if (hunt_house != NULL) {
+				hunt_house->Do_All_To_Hunt();
+			}
 			break;
+		}
 
 		/*
 		**	This will destroy all objects that this trigger is
@@ -851,4 +870,3 @@ NeedType Action_Needs(TActionType action)
 	}
 	return(NEED_NONE);
 }
-

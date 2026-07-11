@@ -9,6 +9,7 @@
  */
 
 #include	"function.h"
+#include	"savedescription.h"
 #include	"vortex.h"
 #ifdef WIN32
 #include "tcpip.h"
@@ -1347,7 +1348,7 @@ bool Get_Savefile_Info(int id, char * buf, unsigned * scenp, HousesType * housep
 		return(false);
 	}
 
-	descr_buf[strlen(descr_buf) - 2] = '\0';	// trim off CR/LF
+	Normalize_Save_Description(descr_buf, DESCRIP_MAX);
 	strcpy(buf, descr_buf);
 
 	if (straw.Get(scenp, sizeof(unsigned)) != sizeof(unsigned)) {

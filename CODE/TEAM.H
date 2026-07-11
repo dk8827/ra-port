@@ -169,7 +169,7 @@ class TeamClass : public AbstractClass
 		TeamClass(NoInitClass const & x) : AbstractClass(x), Class(x), House(x), SuspendTimer(x), Trigger(x), TimeOut(x), Member(x) {};
 		virtual ~TeamClass(void);
 		static void operator delete(void *ptr);
-		static void * operator new(size_t size);
+		static void * operator new(size_t size) throw();
 		static void * operator new(size_t, void * ptr) {return(ptr);};
 		static void Init(void);
 		static void Suspend_Teams(int priority, HouseClass const * house);

@@ -334,7 +334,7 @@ bool TriggerClass::Spring(TEventType event, ObjectClass * obj, CELL cell, bool f
  * HISTORY:                                                                                    *
  *   11/28/1994 BR : Created.                                                                  *
  *=============================================================================================*/
-void * TriggerClass::operator new(size_t )
+void * TriggerClass::operator new(size_t ) throw()
 {
 	void * ptr = Triggers.Allocate();
 	if (ptr) {

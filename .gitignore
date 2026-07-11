@@ -56,3 +56,4 @@ HALLFAME.*
 .DS_Store
 *.swp
 *.swo
+.worktrees/

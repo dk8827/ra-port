@@ -135,7 +135,7 @@ class HouseTypeClass : public AbstractTypeClass
 
 		unsigned char const * Remap_Table(void) const;
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -746,7 +746,7 @@ class BuildingTypeClass : public TechnoTypeClass {
 						);
 		operator StructType(void) const {return(Type);};
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -950,7 +950,7 @@ class UnitTypeClass : public TechnoTypeClass
 						MissionType order
 						);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1054,7 +1054,7 @@ class VesselTypeClass : public TechnoTypeClass
 						int toffset
 						);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1197,7 +1197,7 @@ class InfantryTypeClass : public TechnoTypeClass
 						int pronelaunch,
 						unsigned char const * override_remap);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1297,7 +1297,7 @@ class AircraftTypeClass : public TechnoTypeClass
 				int rotation,
 				MissionType deforder);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1477,7 +1477,7 @@ class BulletTypeClass : public ObjectTypeClass
 		BulletTypeClass(NoInitClass const & x) : ObjectTypeClass(x) {}
 		BulletTypeClass(char const * name);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1536,7 +1536,7 @@ class TerrainTypeClass : public ObjectTypeClass
 				short const * occupy,
 				short const * overlap);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1597,7 +1597,7 @@ class TemplateTypeClass: public ObjectTypeClass
 			char const * ininame,
 			int fullname);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1794,7 +1794,7 @@ class AnimTypeClass : public ObjectTypeClass
 							AnimType chainto);
 
 		static void Init_Heap(void);
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1901,7 +1901,7 @@ class OverlayTypeClass: public ObjectTypeClass
 			bool iswall,
 			bool iscrate);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 
@@ -1971,7 +1971,7 @@ class SmudgeTypeClass : public ObjectTypeClass
 			bool iscrater
 			);
 
-		static void * operator new(size_t);
+		static void * operator new(size_t) throw();
 		static void * operator new(size_t , void * ptr) {return(ptr);};
 		static void operator delete(void * ptr);
 

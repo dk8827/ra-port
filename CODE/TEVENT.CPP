@@ -9,6 +9,7 @@
  */
 
 #include	"function.h"
+#include	"triggerwidth.h"
 
 /*
 **	This is the text name for all of the trigger events. These are used by the scenario editor
@@ -183,6 +184,12 @@ void TEventClass::Reset(TDEventClass & td) const
 bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType house, ObjectClass const * object, bool forced)
 {
 	/*
+	**	Mission INI stores event types in a one-byte field; narrow so comparisons
+	**	match original Watcom enum width (see Normalize_Trigger_Data).
+	*/
+	TEventType const Type = (TEventType)Legacy_Trigger_Byte(Event);
+
+	/*
 	**	If this trigger event has been forced, then no further checks are required.
 	**	Force the trigger to be tripped.
 	*/
@@ -197,7 +204,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	**	global flags are triggered only when the appropriate condition
 	**	is true.
 	*/
-	switch (Event) {
+	switch (Type) {
 		case TEVENT_GLOBAL_SET:
 			if (!Scen.GlobalFlags[Data.Value]) return(false);
 			return(true);
@@ -220,7 +227,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	**	Don't trigger this event if the parameters mean nothing. Typical of
 	**	this would be for events related to time or other outside influences.
 	*/
-	if (Event == TEVENT_NONE) {
+	if (Type == TEVENT_NONE) {
 		return(false);
 	}
 
@@ -230,17 +237,17 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	**	true just by the fact that this routine is called with the appropriate
 	**	event identifier.
 	*/
-	if (Event == TEVENT_ATTACKED ||
-		Event == TEVENT_DESTROYED ||
-		Event == TEVENT_DISCOVERED ||
-		Event == TEVENT_SPIED ||
-		Event == TEVENT_NONE ||
-		Event == TEVENT_CROSS_HORIZONTAL ||
-		Event == TEVENT_CROSS_VERTICAL ||
-		Event == TEVENT_ENTERS_ZONE ||
-		Event == TEVENT_PLAYER_ENTERED) {
+	if (Type == TEVENT_ATTACKED ||
+		Type == TEVENT_DESTROYED ||
+		Type == TEVENT_DISCOVERED ||
+		Type == TEVENT_SPIED ||
+		Type == TEVENT_NONE ||
+		Type == TEVENT_CROSS_HORIZONTAL ||
+		Type == TEVENT_CROSS_VERTICAL ||
+		Type == TEVENT_ENTERS_ZONE ||
+		Type == TEVENT_PLAYER_ENTERED) {
 
-		if (event != Event && event != TEVENT_ANY) {
+		if (event != Type && event != TEVENT_ANY) {
 			return(false);
 		}
 	}
@@ -250,7 +257,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	**	matching ownership has entered the cell in question. All other
 	**	conditions will not trigger the event.
 	*/
-	if (Event == TEVENT_PLAYER_ENTERED || Event == TEVENT_CROSS_HORIZONTAL || Event == TEVENT_CROSS_VERTICAL || Event == TEVENT_ENTERS_ZONE) {
+	if (Type == TEVENT_PLAYER_ENTERED || Type == TEVENT_CROSS_HORIZONTAL || Type == TEVENT_CROSS_VERTICAL || Type == TEVENT_ENTERS_ZONE) {
 		if (!object || object->Owner() != Data.House) return(false);
 		td.IsTripped = true;
 		return(true);
@@ -259,7 +266,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	/*
 	**	Check for all bridges destroyed condition.
 	*/
-	if (Event == TEVENT_ALL_BRIDGES_DESTROYED) {
+	if (Type == TEVENT_ALL_BRIDGES_DESTROYED) {
 		if (Scen.BridgeCount) return(false);
 		td.IsTripped = true;
 		return(true);
@@ -274,7 +281,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 	HouseClass * hptr = HouseClass::As_Pointer(house);
 	int index;
 	if (hptr != NULL) {
-		switch (Event) {
+		switch (Type) {
 			/*
 			**	Check to see if a team of the appropriate type has left the map.
 			*/
@@ -379,7 +386,7 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 
 	hptr = HouseClass::As_Pointer(Data.House);
 	if (hptr) {
-		switch (Event) {
+		switch (Type) {
 			case TEVENT_LOW_POWER:
 				if (hptr->Power_Fraction() >= 1) return(false);
 				break;
@@ -420,6 +427,19 @@ bool TEventClass::operator () (TDEventClass & td, TEventType event, HousesType h
 			case TEVENT_ALL_DESTROYED:
 				if (hptr->ActiveBScan | hptr->ActiveUScan | hptr->ActiveIScan | hptr->ActiveVScan) return(false);
 				break;
+
+			default:
+				break;
+		}
+	} else {
+		switch (Type) {
+			case TEVENT_LOW_POWER:
+			case TEVENT_THIEVED:
+			case TEVENT_HOUSE_DISCOVERED:
+			case TEVENT_BUILDINGS_DESTROYED:
+			case TEVENT_UNITS_DESTROYED:
+			case TEVENT_ALL_DESTROYED:
+				return(false);
 
 			default:
 				break;
@@ -471,7 +491,7 @@ void TEventClass::Read_INI(void)
 	char const * token;
 	switch (NewINIFormat) {
 		default:
-			Event = TEventType(atoi(strtok(NULL, ",")));
+			Event = (TEventType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 			Team.Set_Raw(atoi(strtok(NULL, ",")));
 			Data.Value = atoi(strtok(NULL, ","));
 			break;
@@ -479,7 +499,7 @@ void TEventClass::Read_INI(void)
 		case 1:
 			token = strtok(NULL, ",");
 			Event = TEVENT_NONE;
-			if (token) Event = TEventType(atoi(token));
+			if (token) Event = (TEventType)Legacy_Trigger_Byte(atoi(token));
 
 			token = strtok(NULL, ",");
 			Team = NULL;
@@ -494,7 +514,7 @@ void TEventClass::Read_INI(void)
 			break;
 
 		case 0:
-			Event = TEventType(atoi(strtok(NULL, ",")));
+			Event = (TEventType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 
 			strtok(NULL, ",");
 			strtok(NULL, ",");
@@ -504,6 +524,7 @@ void TEventClass::Read_INI(void)
 			strtok(NULL, ",");
 			break;
 	}
+	Data.Value = Normalize_Trigger_Data(Event_Needs(Event), Data.Value);
 }
 
 

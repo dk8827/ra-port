@@ -117,7 +117,7 @@ ResultType TerrainClass::Take_Damage(int & damage, int distance, WarheadType war
  * HISTORY:                                                                                    *
  *   05/14/1994 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * TerrainClass::operator new(size_t)
+void * TerrainClass::operator new(size_t) throw()
 {
 	void * ptr = Terrains.Allocate();
 	if (ptr) {

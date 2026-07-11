@@ -10,6 +10,7 @@
 
 #include	"function.h"
 #include	"trigtype.h"
+#include	"triggerwidth.h"
 
 
 /***********************************************************************************************
@@ -73,7 +74,7 @@ TriggerTypeClass::~TriggerTypeClass(void)
  * HISTORY:                                                                                    *
  *   07/09/1996 JLB : Created.                                                                 *
  *=============================================================================================*/
-void * TriggerTypeClass::operator new(size_t )
+void * TriggerTypeClass::operator new(size_t ) throw()
 {
 	void * ptr = TriggerTypes.Allocate();
 	if (ptr) {
@@ -1898,7 +1899,7 @@ void TriggerTypeClass::Fill_In(char * name, char * entry)
 	Set_Name(name);
 
 	IsPersistant = PersistantType(atoi(strtok(entry, ",")));
-	House = HousesType(atoi(strtok(NULL, ",")));
+	House = (HousesType)Legacy_Trigger_Byte(atoi(strtok(NULL, ",")));
 	EventControl = MultiStyleType(atoi(strtok(NULL, ",")));
 	ActionControl = MultiStyleType(atoi(strtok(NULL, ",")));
 
