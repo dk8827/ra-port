@@ -9,6 +9,7 @@
  */
 
 #include	"function.h"
+#include	"savedescription.h"
 #include	"vortex.h"
 #ifdef WIN32
 #include "tcpip.h"
@@ -1347,16 +1348,7 @@ bool Get_Savefile_Info(int id, char * buf, unsigned * scenp, HousesType * housep
 		return(false);
 	}
 
-	/*
-	**	A corrupt or foreign save file may fill the description with no NUL
-	**	terminator; don't let strlen() run off the buffer or the trim
-	**	underflow the index.
-	*/
-	descr_buf[DESCRIP_MAX - 1] = '\0';
-	size_t descr_len = strlen(descr_buf);
-	if (descr_len >= 2) {
-		descr_buf[descr_len - 2] = '\0';	// trim off CR/LF
-	}
+	Normalize_Save_Description(descr_buf, DESCRIP_MAX);
 	strcpy(buf, descr_buf);
 
 	if (straw.Get(scenp, sizeof(unsigned)) != sizeof(unsigned)) {
