@@ -1486,6 +1486,7 @@ static inline void _splitpath(char const *path, char *drive, char *dir, char *fn
 	}
 }
 
+#ifndef _lrotl
 static inline long _lrotl(long value, int shift)
 {
 	unsigned long x = (unsigned long)value;
@@ -1493,6 +1494,7 @@ static inline long _lrotl(long value, int shift)
 	shift &= (int)(bits - 1);
 	return (long)((x << shift) | (x >> (bits - shift)));
 }
+#endif
 
 static inline char *itoa(int value, char *buffer, int radix)
 {
