@@ -755,7 +755,7 @@ TTimerClass<SystemTimerClass> TickCount = 0;
 #ifdef WIN32
 
 bool InDebugger = false;
-bool ReadyToQuit = false;
+int ReadyToQuit = 0;
 
 #else
 bool IsTheaterShape = false;	// must be defined only if not Win32
