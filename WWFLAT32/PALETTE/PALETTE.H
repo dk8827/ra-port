@@ -52,7 +52,7 @@ extern BOOL Bump_Color(VOID *palette, WORD changable, WORD target);
 #ifdef __cplusplus
 }
 #endif
-extern "C" extern UBYTE  CurrentPalette[];		/* in pal.asm */
+extern "C" UBYTE  CurrentPalette[];		/* in pal.asm */
 
 
 #endif // PALETTE_H

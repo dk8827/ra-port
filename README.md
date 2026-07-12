@@ -1,8 +1,9 @@
 # ra-port
 
-**Native macOS, Android, and iOS source port of Command & Conquer: Red Alert.**
+**Native macOS, Linux, Android, and iOS source port of Command & Conquer: Red Alert.**
 
 [![macOS](https://img.shields.io/badge/macOS-native-111111?logo=apple&logoColor=white)](#quick-start)
+[![Linux](https://img.shields.io/badge/Linux-Ubuntu-e95420?logo=ubuntu&logoColor=white)](#linux-desktop)
 [![Android](https://img.shields.io/badge/Android-debug%20APK-3ddc84?logo=android&logoColor=white)](#android-debug-apk)
 [![iOS](https://img.shields.io/badge/iOS-debug%20app-111111?logo=apple&logoColor=white)](#ios-debug-app)
 [![Build](https://img.shields.io/badge/build-CMake%20%2B%20Ninja-064f8c)](#build-from-source)
@@ -10,7 +11,7 @@
 [![Source-only](https://img.shields.io/badge/source--only-no%20game%20data-lightgrey)](#game-data)
 [![License](https://img.shields.io/badge/license-GPLv3%20with%20additional%20terms-blue)](#license-and-notice)
 
-`ra-port` lets you play Red Alert (1996) on modern platforms. It currently runs as a native macOS executable, a local Android debug APK, and an iOS debug app, with SDL2 providing the platform layer.
+`ra-port` lets you play Red Alert (1996) on modern platforms. It currently runs as native macOS and Linux executables, a local Android debug APK, and an iOS debug app, with SDL2 providing the platform layer.
 
 ![Red Alert running natively in a macOS window](docs/images/ra-port-macos-window.png)
 
@@ -18,7 +19,7 @@ The repository contains only source code and build tooling. No game assets are i
 
 ## Why This Exists
 
-Red Alert was released for a very different desktop world. This project keeps the original code recognizable while supporting macOS, Android, and iOS.
+Red Alert was released for a very different desktop world. This project keeps the original code recognizable while supporting macOS, Linux, Android, and iOS.
 
 This is an unofficial source port based on the source code Electronic Arts released under GPLv3 with additional terms: <https://github.com/electronicarts/CnC_Red_Alert>.
 
@@ -27,6 +28,7 @@ This is an unofficial source port based on the source code Electronic Arts relea
 | Status | Feature | Notes |
 | --- | --- | --- |
 | :white_check_mark: | macOS on Apple Silicon | Builds and runs with CMake/Ninja. |
+| :white_check_mark: | Linux on Ubuntu | Builds and runs as a native SDL2 desktop executable. |
 | :white_check_mark: | Android debug APK | Builds a local landscape APK for arm64-v8a devices and emulators. |
 | :white_check_mark: | iOS debug app | Builds a landscape simulator/device app with CMake/Xcode. |
 | :white_check_mark: | Campaign | Allied and Soviet campaigns are fully working. |
@@ -56,6 +58,15 @@ cmake -S . -B build -G Ninja
 cmake --build build --target redalert_mac -j 8
 ```
 
+On Ubuntu, install the Linux build tools and build the port:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build pkg-config libsdl2-dev
+cmake -S . -B build-linux -G Ninja
+cmake --build build-linux --target redalert_linux -j 8
+```
+
 Prepare local game data:
 
 ```sh
@@ -68,6 +79,12 @@ Run:
 
 ```sh
 scripts/run_mac_dev.sh --no-build
+```
+
+On Ubuntu, run:
+
+```sh
+scripts/run_linux_dev.sh --no-build
 ```
 
 To build and run the Android debug APK, install the Android prerequisites listed below, keep the same prepared local game data under `assets/redalert`, then run:
@@ -99,7 +116,7 @@ The Android and iOS debug builds use the same ignored `assets/redalert` tree. Gr
 
 ## Build From Source
 
-Configure and build:
+Configure and build on macOS:
 
 ```sh
 cmake -S . -B build -G Ninja
@@ -116,6 +133,35 @@ build/redalert_mac
 
 It is not packaged as a `.app` bundle yet.
 
+## Linux Desktop
+
+Install Ubuntu build dependencies:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y build-essential cmake ninja-build pkg-config libsdl2-dev
+```
+
+Configure and build:
+
+```sh
+cmake -S . -B build-linux -G Ninja
+cmake --build build-linux --target redalert_linux -j 8
+```
+
+Run from the repository root:
+
+```sh
+scripts/run_linux_dev.sh
+```
+
+For headless smoke validation, install Xvfb and ImageMagick, then capture the title/menu:
+
+```sh
+sudo apt-get install -y xvfb imagemagick
+scripts/smoke_linux_menu.sh --seconds 20
+```
+
 ## Run
 
 The normal development run command builds if needed, verifies local assets, codesigns the executable, and launches from the repository root:
@@ -129,6 +175,14 @@ Useful variants:
 ```sh
 scripts/run_mac_dev.sh --no-build
 scripts/run_mac_dev.sh --prepare-only
+```
+
+The Linux run helper follows the same flow without codesigning:
+
+```sh
+scripts/run_linux_dev.sh
+scripts/run_linux_dev.sh --no-build
+scripts/run_linux_dev.sh --prepare-only
 ```
 
 You can also run the built executable directly after codesigning:
@@ -244,7 +298,8 @@ RA_FULLSCREEN=1 scripts/run_mac_dev.sh
 Toggle fullscreen while running:
 
 ```text
-Command+Return
+Command+Return on macOS
+Alt+Return on Linux
 ```
 
 ## Tests
@@ -263,24 +318,32 @@ cmake --build build --target redalert_mac -j 8
 tests/run_script_tests.sh
 ```
 
+On Linux:
+
+```sh
+cmake -S . -B build-linux -G Ninja
+cmake --build build-linux --target redalert_linux -j 8
+tests/run_script_tests.sh
+```
+
 ## Project Layout
 
 | Path | Purpose |
 | --- | --- |
 | `CODE/` | Main Red Alert game code |
-| `PORT/MAC/` | macOS runtime, compatibility shims, SDL2 integration |
+| `PORT/MAC/` | Shared desktop runtime, compatibility shims, SDL2 integration |
 | `PORT/ANDROID/` | Android entrypoint and platform-specific resource setup |
 | `PORT/IOS/` | iOS entrypoint and writable sandbox resource setup |
 | `android/` | Gradle Android app that builds the debug APK |
 | `ios/` | CMake/Xcode iOS app target |
 | `WIN32LIB/`, `WINVQ/` | Legacy support libraries used by the port |
-| `scripts/` | Asset preparation, run helpers, smoke capture |
+| `scripts/` | Asset preparation, run helpers, smoke capture, Linux include overlay generation |
 | `tests/` | Focused source-level and shim tests |
 | `docs/images/` | README images only, not game data |
 
 ## Contributing
 
-The port is intentionally conservative: keep original source layout and behavior recognizable, and prefer small platform-specific support files over broad rewrites. Good next areas are macOS `.app` packaging, Android/iOS release packaging, physical device validation, Intel macOS validation, save/load hardening, expansion support, CI coverage, and mobile input/UI polish.
+The port is intentionally conservative: keep original source layout and behavior recognizable, and prefer small platform-specific support files over broad rewrites. Good next areas are macOS `.app` packaging, Linux packaging, Android/iOS release packaging, physical device validation, Intel macOS validation, save/load hardening, expansion support, CI coverage, and mobile input/UI polish.
 
 Network and online multiplayer are out of scope for the current milestone.
 

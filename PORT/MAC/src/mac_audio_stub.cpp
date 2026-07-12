@@ -2,7 +2,7 @@
 #include "AUDIO.H"
 #include "FILE.H"
 
-#include <SDL.h>
+#include "mac_sdl.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

@@ -8,8 +8,7 @@
  * See LICENSE.md.
  */
 
-//#define WIN32
-//#include <windows.h>
+#include <windows.h>
 #include <stdio.h>
 #include	<string.h>
 
@@ -58,7 +57,6 @@ void Get_CPU_Type(int & cpu_type, bool & mmx, char * vendor_id, int vendor_id_le
 	char * vendor_ptr = &VendorID;
 	strncpy(vendor_id, vendor_ptr, vendor_id_length);
 }
-
 
 
 

@@ -11,6 +11,8 @@ android/app/.cxx/
 android/app/build/
 android/local.properties
 android/third_party/
+android/emulator-ra-port-*.pid
+android/redalert_android_smoke*.png
 
 ios/build*/
 ios/third_party/

@@ -107,6 +107,34 @@ set(RA95_INCLUDE_DIRS
     "${RA95_REPO_ROOT}/VQ/INCLUDE/VQM32"
 )
 
+set(RA95_CASEFOLD_INCLUDE_ROOT "${CMAKE_BINARY_DIR}/ra95_casefold_include")
+execute_process(
+    COMMAND
+        "${RA95_REPO_ROOT}/scripts/create_casefold_include_overlay.sh"
+        "${RA95_CASEFOLD_INCLUDE_ROOT}"
+        PORT/MAC/include
+        CODE
+        WIN32LIB
+        WWFLAT32
+        WINVQ/INCLUDE
+        VQ/INCLUDE
+    WORKING_DIRECTORY "${RA95_REPO_ROOT}"
+    RESULT_VARIABLE RA95_CASEFOLD_INCLUDE_RESULT
+    ERROR_VARIABLE RA95_CASEFOLD_INCLUDE_ERROR
+)
+if(NOT RA95_CASEFOLD_INCLUDE_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to create casefold include overlay: ${RA95_CASEFOLD_INCLUDE_ERROR}")
+endif()
+
+set(RA95_CASEFOLD_INCLUDE_DIRS)
+foreach(include_dir IN LISTS RA95_INCLUDE_DIRS)
+    file(RELATIVE_PATH include_rel "${RA95_REPO_ROOT}" "${include_dir}")
+    string(TOLOWER "${include_rel}" include_rel_lower)
+    if(EXISTS "${RA95_CASEFOLD_INCLUDE_ROOT}/${include_rel_lower}")
+        list(APPEND RA95_CASEFOLD_INCLUDE_DIRS "${RA95_CASEFOLD_INCLUDE_ROOT}/${include_rel_lower}")
+    endif()
+endforeach()
+
 set(RA95_COMPILE_DEFINITIONS
     TRUE_FALSE_DEFINED
     WIN32
@@ -119,14 +147,74 @@ set(RA95_COMPILE_DEFINITIONS
 
 set(RA95_COMPILE_OPTIONS
     -Wno-unknown-pragmas
-    -Wno-deprecated-register
-    -Wno-writable-strings
     -Wno-multichar
+)
+
+set(RA95_CLANG_COMPILE_OPTIONS
+    -Wno-writable-strings
+    -Wno-deprecated-register
     -Wno-nonportable-include-path
 )
 
+set(RA95_GNU_COMPILE_OPTIONS
+    -fpermissive
+    -fno-access-control
+    -Wno-write-strings
+    -include
+    "${RA95_REPO_ROOT}/PORT/MAC/include/legacy_compiler_compat.h"
+)
+
+set(RA95_CODE_QUOTE_SOURCES
+    "${RA95_REPO_ROOT}/PORT/MAC/src/legacy_primitives.cpp"
+    "${RA95_REPO_ROOT}/PORT/MAC/src/legacy_ops.cpp"
+)
+
+function(ra95_add_casefold_quote_includes target_name)
+    get_target_property(ra95_target_sources ${target_name} SOURCES)
+    foreach(source IN LISTS ra95_target_sources)
+        if(source MATCHES "^\\$<")
+            continue()
+        endif()
+        if(IS_ABSOLUTE "${source}")
+            set(source_abs "${source}")
+        else()
+            get_filename_component(source_abs "${source}" ABSOLUTE BASE_DIR "${RA95_REPO_ROOT}")
+        endif()
+        if(NOT EXISTS "${source_abs}")
+            continue()
+        endif()
+
+        get_filename_component(source_dir "${source_abs}" DIRECTORY)
+        file(RELATIVE_PATH source_dir_rel "${RA95_REPO_ROOT}" "${source_dir}")
+        string(TOLOWER "${source_dir_rel}" source_dir_rel_lower)
+        set(source_casefold_dir "${RA95_CASEFOLD_INCLUDE_ROOT}/${source_dir_rel_lower}")
+        if(EXISTS "${source_casefold_dir}")
+            set_property(SOURCE "${source}" APPEND PROPERTY COMPILE_OPTIONS "-iquote${source_casefold_dir}")
+            if(NOT source STREQUAL source_abs)
+                set_property(SOURCE "${source_abs}" APPEND PROPERTY COMPILE_OPTIONS "-iquote${source_casefold_dir}")
+            endif()
+        endif()
+        if(source_abs IN_LIST RA95_CODE_QUOTE_SOURCES)
+            set(code_casefold_dir "${RA95_CASEFOLD_INCLUDE_ROOT}/code")
+            if(EXISTS "${code_casefold_dir}")
+                set_property(SOURCE "${source}" APPEND PROPERTY COMPILE_OPTIONS "-iquote${code_casefold_dir}")
+                if(NOT source STREQUAL source_abs)
+                    set_property(SOURCE "${source_abs}" APPEND PROPERTY COMPILE_OPTIONS "-iquote${code_casefold_dir}")
+                endif()
+            endif()
+        endif()
+    endforeach()
+endfunction()
+
 function(ra95_configure_target target_name)
-    target_include_directories(${target_name} PRIVATE ${RA95_INCLUDE_DIRS})
+    target_include_directories(${target_name} PRIVATE ${RA95_CASEFOLD_INCLUDE_DIRS} ${RA95_INCLUDE_DIRS})
     target_compile_definitions(${target_name} PRIVATE ${RA95_COMPILE_DEFINITIONS})
     target_compile_options(${target_name} PRIVATE ${RA95_COMPILE_OPTIONS})
+    ra95_add_casefold_quote_includes(${target_name})
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${target_name} PRIVATE ${RA95_CLANG_COMPILE_OPTIONS})
+    endif()
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${target_name} PRIVATE ${RA95_GNU_COMPILE_OPTIONS})
+    endif()
 endfunction()

@@ -1,15 +1,8 @@
-#ifdef WIN32
-#define MACVQA_RESTORE_WIN32 1
-#undef WIN32
-#endif
 #include <algorithm>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-#include <SDL.h>
-#ifdef MACVQA_RESTORE_WIN32
-#define WIN32 1
-#endif
+#include "mac_sdl.h"
 
 #include <VQA32/VQAPLAY.H>
 

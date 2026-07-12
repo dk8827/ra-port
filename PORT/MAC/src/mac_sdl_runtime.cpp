@@ -1,5 +1,4 @@
-#define SDL_MAIN_HANDLED
-#include <SDL.h>
+#include "mac_sdl.h"
 
 #include <stdint.h>
 #include <stdlib.h>

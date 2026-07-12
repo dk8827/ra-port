@@ -48,6 +48,9 @@ assert_executable scripts/build_android_debug.sh
 assert_executable scripts/run_android_debug.sh
 assert_executable scripts/build_ios_debug.sh
 assert_executable scripts/run_ios_simulator.sh
+assert_executable scripts/create_casefold_include_overlay.sh
+assert_executable scripts/run_linux_dev.sh
+assert_executable scripts/smoke_linux_menu.sh
 
 legacy_stage_arg="--staging-""dir"
 legacy_tmp_dir="/tmp/redalert_""mac_run"
@@ -76,6 +79,15 @@ assert_help_contains scripts/run_ios_simulator.sh "simctl"
 assert_help_contains scripts/run_ios_simulator.sh "--no-build"
 assert_help_contains scripts/run_ios_simulator.sh "--device"
 assert_help_contains scripts/run_ios_simulator.sh "--no-landscape"
+assert_help_contains scripts/run_linux_dev.sh "redalert_linux"
+assert_help_contains scripts/run_linux_dev.sh "--prepare-only"
+assert_help_contains scripts/run_linux_dev.sh "--no-build"
+assert_file_not_contains scripts/run_linux_dev.sh "codesign"
+assert_help_contains scripts/smoke_linux_menu.sh "Xvfb"
+assert_help_contains scripts/smoke_linux_menu.sh "--screenshot"
+assert_help_contains scripts/smoke_linux_menu.sh "--keep-running"
+assert_file_not_contains scripts/smoke_linux_menu.sh "screencapture"
+assert_file_not_contains scripts/smoke_linux_menu.sh "swift"
 
 assert_file_not_contains scripts/run_mac_dev.sh "$legacy_tmp_dir"
 assert_file_not_contains scripts/run_mac_dev.sh "$legacy_stage_var"
@@ -130,6 +142,40 @@ assert_file_contains ios/CMakeLists.txt "copy_directory"
 assert_file_contains ios/Info.plist.in "UIApplicationSupportsIndirectInputEvents"
 assert_file_contains ios/Info.plist.in "UIInterfaceOrientationLandscapeLeft"
 assert_file_contains ios/Info.plist.in "UIInterfaceOrientationLandscapeRight"
+assert_file_contains CMakeLists.txt "redalert_linux"
+assert_file_contains CMakeLists.txt "Threads::Threads"
+assert_file_contains cmake/ra95_common.cmake "RA95_CASEFOLD_INCLUDE_ROOT"
+assert_file_contains cmake/ra95_common.cmake "create_casefold_include_overlay.sh"
+assert_file_contains cmake/ra95_common.cmake "string(TOLOWER"
+assert_file_contains cmake/ra95_common.cmake "-iquote"
+assert_file_contains cmake/ra95_common.cmake "-fpermissive"
+assert_file_contains cmake/ra95_common.cmake "-fno-access-control"
+assert_file_contains cmake/ra95_common.cmake "legacy_compiler_compat.h"
+assert_file_contains PORT/MAC/src/main.cpp "SDL_GetBasePath"
+assert_file_not_contains PORT/MAC/src/main.cpp "mach-o/dyld.h"
+assert_file_contains PORT/MAC/include/mac_sdl.h "#undef WIN32"
+assert_file_contains PORT/MAC/include/legacy_compiler_compat.h "#define __cdecl"
+assert_file_contains PORT/MAC/include/legacy_compiler_compat.h "#define _USERENTRY"
+assert_file_contains PORT/MAC/src/main.cpp "#include \"mac_sdl.h\""
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "#include \"mac_sdl.h\""
+assert_file_contains PORT/MAC/src/mac_audio_stub.cpp "#include \"mac_sdl.h\""
+assert_file_contains PORT/MAC/include/windows.h "__ANDROID__) || defined(__linux__)"
+assert_file_contains PORT/MAC/include/windows.h "#include <arpa/inet.h>"
+assert_file_contains PORT/MAC/include/malloc.h "#include_next <malloc.h>"
+assert_file_not_contains PORT/MAC/include/malloc.h "#pragma once"
+assert_file_contains CODE/GETCPU.CPP "#include <windows.h>"
+assert_file_contains WIN32LIB/INCLUDE/PALETTE.H 'extern "C" unsigned char  CurrentPalette[]'
+assert_file_contains WIN32LIB/PALETTE/PALETTE.H 'extern "C" unsigned char  CurrentPalette[]'
+assert_file_contains WIN32LIB/PALETTE/PALETTE.CPP 'extern "C" unsigned char  CurrentPalette[]'
+assert_file_contains WWFLAT32/PALETTE/PALETTE.H 'extern "C" UBYTE  CurrentPalette[]'
+assert_file_not_contains WIN32LIB/INCLUDE/_FILE.H 'extern "C" extern'
+assert_file_not_contains WWFLAT32/INCLUDE/_FILE.H 'extern "C" extern'
+assert_file_not_contains WWFLAT32/FILE/_FILE.H 'extern "C" extern'
+assert_file_contains CODE/SEARCH.H "typename IndexClass<T>::NodeElement const *"
+assert_file_contains .github/workflows/linux-build.yml "ubuntu-24.04"
+assert_file_contains .github/workflows/linux-build.yml "ubuntu-26.04"
+assert_file_contains .github/workflows/linux-build.yml "redalert_linux"
+assert_file_contains .github/workflows/linux-build.yml "libsdl2-dev"
 assert_file_contains scripts/build_ios_debug.sh 'SDL_VERSION="2.32.10"'
 assert_file_contains scripts/build_ios_debug.sh "-DCMAKE_SYSTEM_NAME=iOS"
 assert_file_contains scripts/build_ios_debug.sh "iphonesimulator"
@@ -361,79 +407,101 @@ perl -0ne 'exit(/void Move_Point\([^)]*\)\s*\{(?:(?!void Normal_Move_Point)[\s\S
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" "$ROOT_DIR/tests/ddraw_shim_test.cpp" -o "$tmpdir/ddraw_shim_test"
+"$ROOT_DIR/scripts/create_casefold_include_overlay.sh" "$tmpdir/casefold" CODE PORT/MAC/include WIN32LIB WINVQ/INCLUDE
+[[ -L "$tmpdir/casefold/code/fixed.h" ]] || fail "casefold include overlay must expose CODE/FIXED.H as fixed.h"
+[[ -L "$tmpdir/casefold/code/infantry.H" ]] || fail "casefold include overlay must expose mixed-case legacy include spellings"
+[[ -L "$tmpdir/casefold/code/WolDebug.h" ]] || fail "casefold include overlay must expose exact quoted include spellings"
+[[ -L "$tmpdir/casefold/port/mac/include/windows.h" ]] || fail "casefold include overlay must expose PORT/MAC/include/windows.h"
+[[ -L "$tmpdir/casefold/winvq/include/vqa32/vqaplay.h" ]] || fail "casefold include overlay must expose nested VQA headers with lower-case paths"
+cxx_cmd=(
+  "${CXX:-c++}"
+  -std=gnu++98
+  -include "$ROOT_DIR/PORT/MAC/include/legacy_compiler_compat.h"
+)
+inc_port=(-I"$tmpdir/casefold/port/mac/include" -I"$ROOT_DIR/PORT/MAC/include")
+inc_code=(-I"$tmpdir/casefold/code" -I"$ROOT_DIR/CODE")
+inc_win_include=(-I"$tmpdir/casefold/win32lib/include" -I"$ROOT_DIR/WIN32LIB/INCLUDE")
+inc_win_audio=(-I"$tmpdir/casefold/win32lib/audio" -I"$ROOT_DIR/WIN32LIB/AUDIO")
+inc_win_iff=(-I"$tmpdir/casefold/win32lib/iff" -I"$ROOT_DIR/WIN32LIB/IFF")
+inc_win_shape=(-I"$tmpdir/casefold/win32lib/shape" -I"$ROOT_DIR/WIN32LIB/SHAPE")
+inc_win_wsa=(-I"$tmpdir/casefold/win32lib/wsa" -I"$ROOT_DIR/WIN32LIB/WSA")
+inc_winvq=(-I"$tmpdir/casefold/winvq/include" -I"$ROOT_DIR/WINVQ/INCLUDE")
+inc_winvq_vqm=(-I"$tmpdir/casefold/winvq/include/vqm32" -I"$ROOT_DIR/WINVQ/INCLUDE/VQM32")
+inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCLUDE/WWLIB32")
+
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/ddraw_shim_test.cpp" -o "$tmpdir/ddraw_shim_test"
 "$tmpdir/ddraw_shim_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/CODE" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_code[@]}" \
   "$ROOT_DIR/tests/coord_cell_test.cpp" -o "$tmpdir/coord_cell_test"
 "$tmpdir/coord_cell_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -DBIG_ENDIAN=4321 -DLITTLE_ENDIAN=1234 -I"$ROOT_DIR/CODE" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED -DBIG_ENDIAN=4321 -DLITTLE_ENDIAN=1234 "${inc_code[@]}" \
   "$ROOT_DIR/tests/fixed_endian_test.cpp" "$ROOT_DIR/CODE/FIXED.CPP" -o "$tmpdir/fixed_endian_test"
 "$tmpdir/fixed_endian_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/CODE" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_code[@]}" \
   "$ROOT_DIR/tests/trigger_width_test.cpp" -o "$tmpdir/trigger_width_test"
 "$tmpdir/trigger_width_test"
 
-"${CXX:-c++}" -std=gnu++98 \
+"${cxx_cmd[@]}" \
   "$ROOT_DIR/tests/operator_new_null_test.cpp" -o "$tmpdir/operator_new_null_test"
 "$tmpdir/operator_new_null_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/CODE" \
+"${cxx_cmd[@]}" "${inc_code[@]}" \
   "$ROOT_DIR/tests/save_description_test.cpp" -o "$tmpdir/save_description_test"
 "$tmpdir/save_description_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/aspect_viewport_test.cpp" -o "$tmpdir/aspect_viewport_test"
 "$tmpdir/aspect_viewport_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_touch_gesture_test.cpp" -o "$tmpdir/mobile_touch_gesture_test"
 "$tmpdir/mobile_touch_gesture_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_pan_test.cpp" -o "$tmpdir/mobile_pan_test"
 "$tmpdir/mobile_pan_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_key_message_test.cpp" -o "$tmpdir/mobile_key_message_test"
 "$tmpdir/mobile_key_message_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" \
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_rubber_band_test.cpp" -o "$tmpdir/mobile_rubber_band_test"
 "$tmpdir/mobile_rubber_band_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/WIN32LIB/WSA" \
+"${cxx_cmd[@]}" "${inc_win_wsa[@]}" \
   "$ROOT_DIR/tests/wsa_file_format_test.cpp" -o "$tmpdir/wsa_file_format_test"
 "$tmpdir/wsa_file_format_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WIN32LIB/SHAPE" -I"$ROOT_DIR/WIN32LIB/INCLUDE" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_shape[@]}" "${inc_win_include[@]}" \
   "$ROOT_DIR/tests/shape_extract_test.cpp" "$ROOT_DIR/WIN32LIB/SHAPE/GETSHAPE.CPP" -o "$tmpdir/shape_extract_test"
 "$tmpdir/shape_extract_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WIN32LIB/INCLUDE" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
   "$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" -o "$tmpdir/cps_uncompress_test"
 "$tmpdir/cps_uncompress_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" "$ROOT_DIR/tests/dos_compat_test.cpp" "$ROOT_DIR/PORT/MAC/src/dos_compat.cpp" -o "$tmpdir/dos_compat_test"
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/dos_compat_test.cpp" "$ROOT_DIR/PORT/MAC/src/dos_compat.cpp" -o "$tmpdir/dos_compat_test"
 "$tmpdir/dos_compat_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WIN32LIB/INCLUDE" -I"$ROOT_DIR/WIN32LIB/AUDIO" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_audio[@]}" \
   "$ROOT_DIR/tests/audio_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_audio_stub.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/audio_shim_test"
 "$tmpdir/audio_shim_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" "$ROOT_DIR/tests/timer_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" -o "$tmpdir/timer_shim_test"
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/timer_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" -o "$tmpdir/timer_shim_test"
 "$tmpdir/timer_shim_test"
 
-"${CXX:-c++}" -std=gnu++98 -I"$ROOT_DIR/PORT/MAC/include" "$ROOT_DIR/tests/input_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/input_shim_test"
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/input_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/input_shim_test"
 "$tmpdir/input_shim_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -DVQADIRECT_SOUND=1 -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WINVQ/INCLUDE" -I"$ROOT_DIR/WINVQ/INCLUDE/VQM32" -I"$ROOT_DIR/WINVQ/INCLUDE/WWLIB32" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED -DVQADIRECT_SOUND=1 "${inc_port[@]}" "${inc_winvq[@]}" "${inc_winvq_vqm[@]}" "${inc_winvq_ww[@]}" "${inc_code[@]}" \
   "$ROOT_DIR/tests/vqa_decode_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_vqa.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/vqa_decode_test"
 "$tmpdir/vqa_decode_test"
 
-"${CXX:-c++}" -std=gnu++98 -DTRUE_FALSE_DEFINED -DVQADIRECT_SOUND=1 -I"$ROOT_DIR/PORT/MAC/include" -I"$ROOT_DIR/WINVQ/INCLUDE" -I"$ROOT_DIR/WINVQ/INCLUDE/VQM32" -I"$ROOT_DIR/WINVQ/INCLUDE/WWLIB32" \
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED -DVQADIRECT_SOUND=1 "${inc_port[@]}" "${inc_winvq[@]}" "${inc_winvq_vqm[@]}" "${inc_winvq_ww[@]}" "${inc_code[@]}" \
   "$ROOT_DIR/tests/vqa_file_smoke_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_vqa.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/vqa_file_smoke_test"
 (cd "$ROOT_DIR" && SDL_AUDIODRIVER=dummy "$tmpdir/vqa_file_smoke_test")
 

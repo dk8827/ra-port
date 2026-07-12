@@ -23,7 +23,7 @@
 /*
 ********************************** Globals **********************************
 */
-extern "C" extern unsigned char  CurrentPalette[];		/* in pal.asm */
+extern "C" unsigned char  CurrentPalette[];		/* in pal.asm */
 
 /*
 ******************************** Prototypes *********************************
@@ -344,6 +344,5 @@ PRIVATE BOOL __cdecl Bump_Palette(void *palette1, unsigned int step)
 void (*cb_ptr)(void);	// callback function pointer
 
 /**************************** End of palette.cpp ***************************/
-
 
 

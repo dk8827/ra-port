@@ -4,8 +4,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__linux__)
 #include <arpa/inet.h>
+#endif
+#if defined(__ANDROID__)
 #include <dirent.h>
 #include <fnmatch.h>
 #else
@@ -109,7 +111,7 @@ typedef DWORD *LPDWORD;
 
 typedef int SOCKET;
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__linux__)
 typedef struct in_addr IN_ADDR;
 #else
 typedef struct in_addr {

@@ -137,7 +137,7 @@ extern VOID Remove_Hard_Error_Handler(VOID);
 /*=========================================================================*/
 
 extern BYTE CallingDOSInt;					 
-extern "C" extern BYTE MaxDevice,DefaultDrive;
+extern "C" BYTE MaxDevice,DefaultDrive;
 extern BYTE MultiDriveSearch;	
 extern FileDataType *FileDataPtr;
 extern FileHandleType FileHandleTable[TABLE_MAX];
@@ -153,5 +153,4 @@ extern WORD MaxDirNum;
 
 
 #endif // _FILE_H
-
 
