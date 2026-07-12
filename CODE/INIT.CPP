@@ -1312,6 +1312,7 @@ bool Select_Game(bool fade)
 				**	Exit to DOS.
 				*/
 				case SEL_EXIT:
+					Theme.Stop();
 					Theme.Fade_Out();
 					BlackPalette.Set(FADE_PALETTE_SLOW);
 					return(false);
