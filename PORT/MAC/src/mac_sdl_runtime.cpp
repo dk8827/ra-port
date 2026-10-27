@@ -8,6 +8,7 @@
 #include "mobile_key_message.h"
 #include "mobile_pan.h"
 #include "mobile_touch_gesture.h"
+#include "mobile_zoom.h"
 #include "ra_aspect_viewport.h"
 #include <mmsystem.h>
 
@@ -38,6 +39,8 @@ extern bool InMovie;
 #if defined(RA_MOBILE_TOUCH)
 static MobileTouchGesture MobileTouch;
 static MobilePanState MobilePan;
+static MobileZoomState MobileZoom;
+static MobilePinchState MobilePinch;
 static bool MobileTouchCursorHidden = true;
 static bool MobilePointerDragCandidate = false;
 static int MobilePointerDragStartX = 0;
@@ -384,6 +387,11 @@ static int mac_vk_from_button(unsigned char button)
 }
 
 #if defined(RA_MOBILE_TOUCH)
+static bool mobile_zoom_applies(void)
+{
+	return !InMovie;
+}
+
 static bool mobile_logical_point(float normalized_x, float normalized_y, int *logical_x, int *logical_y)
 {
 	if (!MacWindow || MacWidth <= 0 || MacHeight <= 0) {
@@ -407,7 +415,22 @@ static bool mobile_logical_point(float normalized_x, float normalized_y, int *lo
 	screen_y = RA_ClampInt(screen_y, 0, window_h - 1);
 
 	RAAspectViewport viewport = RA_CalculateAspectViewport(MacWidth, MacHeight, window_w, window_h);
-	return RA_MapViewportPoint(viewport, MacWidth, MacHeight, screen_x, screen_y, logical_x, logical_y) != 0;
+	bool inside = RA_MapViewportPoint(viewport, MacWidth, MacHeight, screen_x, screen_y, logical_x, logical_y) != 0;
+	if (mobile_zoom_applies() && logical_x && logical_y) {
+		MobileZoom_MapPoint(&MobileZoom, MacWidth, MacHeight, *logical_x, *logical_y, logical_x, logical_y);
+	}
+	return inside;
+}
+
+static void mobile_window_point(float normalized_x, float normalized_y, float *x, float *y)
+{
+	int window_w = MacWidth;
+	int window_h = MacHeight;
+	if (MacWindow) {
+		SDL_GetWindowSize(MacWindow, &window_w, &window_h);
+	}
+	*x = normalized_x * (float)window_w;
+	*y = normalized_y * (float)window_h;
 }
 
 static void mobile_emit_pan_key(void *, int vk)
@@ -418,6 +441,38 @@ static void mobile_emit_pan_key(void *, int vk)
 static void mobile_emit_pan(float dx, float dy)
 {
 	MobilePan_EmitFingerDelta(&MobilePan, dx, dy, MacWidth, MacHeight, mobile_emit_pan_key, 0);
+}
+
+/*
+ * A two-finger move: pinching changes the magnification around the fingers'
+ * midpoint, and moving the midpoint drags the magnified view. Movement the
+ * view can't absorb (always, when unzoomed) scrolls the map as before.
+ * Positions are in window pixels.
+ */
+static void mobile_handle_pinch(float ratio, float mid_x, float mid_y, float mid_dx, float mid_dy)
+{
+	int window_w = MacWidth;
+	int window_h = MacHeight;
+	SDL_GetWindowSize(MacWindow, &window_w, &window_h);
+	RAAspectViewport viewport = mac_window_viewport();
+	if (viewport.w <= 0 || viewport.h <= 0 || window_w <= 0 || window_h <= 0) {
+		return;
+	}
+	float logical_per_px_x = (float)MacWidth / (float)viewport.w;
+	float logical_per_px_y = (float)MacHeight / (float)viewport.h;
+
+	if (mobile_zoom_applies()) {
+		float focus_x = (mid_x - (float)viewport.x) * logical_per_px_x;
+		float focus_y = (mid_y - (float)viewport.y) * logical_per_px_y;
+		MobileZoom_Pinch(&MobileZoom, ratio, focus_x, focus_y, MacWidth, MacHeight);
+	}
+
+	float rest_x = 0.0f;
+	float rest_y = 0.0f;
+	MobileZoom_Pan(&MobileZoom, mid_dx * logical_per_px_x, mid_dy * logical_per_px_y, MacWidth, MacHeight, &rest_x, &rest_y);
+
+	/* Each finger used to scroll the map on its own, so the pair scrolled twice as far as the midpoint moves. */
+	mobile_emit_pan(2.0f * rest_x / logical_per_px_x / (float)window_w, 2.0f * rest_y / logical_per_px_y / (float)window_h);
 }
 
 static void mobile_queue_touch_output(MobileTouchGestureOutput const *out)
@@ -524,6 +579,8 @@ bool MacSDL_SetMode(int width, int height)
 #if defined(RA_MOBILE_TOUCH)
 		MobileTouchGesture_Init(&MobileTouch);
 		MobilePan_Init(&MobilePan);
+		MobileZoom_Init(&MobileZoom);
+		MobilePinch_Init(&MobilePinch);
 #endif
 	}
 
@@ -653,6 +710,10 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				if (!mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y)) {
 					break;
 				}
+				float window_x = 0.0f;
+				float window_y = 0.0f;
+				mobile_window_point(event.tfinger.x, event.tfinger.y, &window_x, &window_y);
+				MobilePinch_Down(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y);
 				MobileTouchGestureOutput out;
 				MobileTouchGesture_Begin(&MobileTouch, (long long)event.tfinger.fingerId, x, y, mac_now_ms(), &out);
 				if (MobileTouch.secondary_active && MobileTouch.secondary_finger == (long long)event.tfinger.fingerId) {
@@ -666,8 +727,22 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = 0;
 				int y = 0;
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
+				float window_x = 0.0f;
+				float window_y = 0.0f;
+				float ratio = 1.0f;
+				float mid_x = 0.0f;
+				float mid_y = 0.0f;
+				float mid_dx = 0.0f;
+				float mid_dy = 0.0f;
+				mobile_window_point(event.tfinger.x, event.tfinger.y, &window_x, &window_y);
+				bool pinch_moved = MobilePinch_Move(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y,
+					&ratio, &mid_x, &mid_y, &mid_dx, &mid_dy) != 0;
 				if (MobileTouchGesture_IsPanFinger(&MobileTouch, (long long)event.tfinger.fingerId)) {
-					mobile_emit_pan(event.tfinger.dx, event.tfinger.dy);
+					if (pinch_moved) {
+						mobile_handle_pinch(ratio, mid_x, mid_y, mid_dx, mid_dy);
+					} else {
+						mobile_emit_pan(event.tfinger.dx, event.tfinger.dy);
+					}
 					break;
 				}
 				MobileTouchGestureOutput out;
@@ -679,6 +754,10 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 			case SDL_FINGERUP: {
 				int x = 0;
 				int y = 0;
+				if (MobilePinch_BothActive(&MobilePinch)) {
+					MobileZoom_SnapIfNearlyUnzoomed(&MobileZoom);
+				}
+				MobilePinch_Up(&MobilePinch, (long long)event.tfinger.fingerId);
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
 				if (InMovie && MobileTouchGesture_IsTapEnd(&MobileTouch, (long long)event.tfinger.fingerId, x, y)) {
 					MobileTouchGesture_Init(&MobileTouch);
@@ -809,7 +888,19 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 	}
 	SDL_SetRenderDrawColor(MacRenderer, 0, 0, 0, 255);
 	SDL_RenderClear(MacRenderer);
-	SDL_RenderCopy(MacRenderer, MacTexture, 0, &destination);
+	SDL_Rect const *source = 0;
+#if defined(RA_MOBILE_TOUCH)
+	SDL_Rect zoom_source;
+	if (mobile_zoom_applies() && MobileZoom_IsZoomed(&MobileZoom) && width == MacWidth && height == MacHeight) {
+		MobileZoomRect rect = MobileZoom_SourceRect(&MobileZoom, width, height);
+		zoom_source.x = rect.x;
+		zoom_source.y = rect.y;
+		zoom_source.w = rect.w;
+		zoom_source.h = rect.h;
+		source = &zoom_source;
+	}
+#endif
+	SDL_RenderCopy(MacRenderer, MacTexture, source, &destination);
 	SDL_RenderPresent(MacRenderer);
 }
 
