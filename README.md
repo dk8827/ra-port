@@ -310,10 +310,10 @@ On Android and iOS:
 | --- | --- |
 | Tap | Left click |
 | Drag | Left-button drag, e.g. a selection box |
-| Long press | Right click |
+| Long press or quick two-finger tap | Right click, e.g. deselect units |
 | Two-finger drag | Scroll the map, or move the magnified view when zoomed in |
 | Pinch | Magnify the screen, up to 3x |
-| Quick two-finger tap | Show the whole screen again |
+| Quick three-finger tap | Show the whole screen again |
 | Tap during a movie | Skip the movie |
 
 ## Tests
