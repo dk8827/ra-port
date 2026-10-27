@@ -154,7 +154,33 @@ static bool copy_file(char const *source, char const *dest)
 	return ok;
 }
 
-static bool copy_directory_recursive(char const *source, char const *dest)
+/*
+ * Files at least this large are game data that is only read (MIX archives,
+ * movies, audio). They are linked to the copy inside the app bundle instead of
+ * duplicated, which keeps the app from storing the game data twice. Smaller
+ * files (INI files and the like) are copied so the game can change them.
+ */
+static off_t const link_threshold = 64 * 1024;
+
+static bool link_file(char const *source, char const *dest)
+{
+	char current[PATH_MAX];
+	ssize_t length = readlink(dest, current, sizeof(current) - 1);
+	if (length >= 0) {
+		current[length] = 0;
+		if (strcmp(current, source) == 0) {
+			return true;
+		}
+	}
+	if (!make_directories(parent_path(dest))) {
+		return false;
+	}
+	/* Replace a link into an older install's bundle, or a full copy made by earlier builds. */
+	unlink(dest);
+	return symlink(source, dest) == 0;
+}
+
+static bool sync_directory_recursive(char const *source, char const *dest)
 {
 	DIR *dir = opendir(source);
 	if (!dir) {
@@ -183,14 +209,23 @@ static bool copy_directory_recursive(char const *source, char const *dest)
 			break;
 		}
 		if (S_ISDIR(info.st_mode)) {
-			if (!copy_directory_recursive(source_path.c_str(), dest_path.c_str())) {
+			if (!sync_directory_recursive(source_path.c_str(), dest_path.c_str())) {
 				ok = false;
 				break;
 			}
 		} else if (S_ISREG(info.st_mode)) {
-			if (!copy_file(source_path.c_str(), dest_path.c_str())) {
-				ok = false;
-				break;
+			struct stat dest_info;
+			if (info.st_size >= link_threshold) {
+				if (!link_file(source_path.c_str(), dest_path.c_str())) {
+					ok = false;
+					break;
+				}
+			} else if (lstat(dest_path.c_str(), &dest_info) != 0) {
+				/* Copy small files only once, so changes the game makes to them are kept. */
+				if (!copy_file(source_path.c_str(), dest_path.c_str())) {
+					ok = false;
+					break;
+				}
 			}
 		}
 	}
@@ -207,7 +242,7 @@ static bool use_resource_root(std::string const &root)
 	return path_exists(config_path());
 }
 
-static bool copy_bundled_assets_to(std::string const &writable_root)
+static bool sync_bundled_assets_to(std::string const &writable_root)
 {
 	char *base_path = SDL_GetBasePath();
 	if (!base_path) {
@@ -221,7 +256,7 @@ static bool copy_bundled_assets_to(std::string const &writable_root)
 	}
 
 	std::string dest = join_path(writable_root, "assets/redalert");
-	if (!copy_directory_recursive(source.c_str(), dest.c_str())) {
+	if (!sync_directory_recursive(source.c_str(), dest.c_str())) {
 		return false;
 	}
 	return path_exists(join_path(writable_root, config_path()).c_str());
@@ -234,9 +269,11 @@ static void select_resource_root(void)
 		std::string writable_root = join_path(pref_path, "redalert-root");
 		SDL_free(pref_path);
 		make_directories(writable_root);
-		if (!path_exists(join_path(writable_root, config_path()).c_str())) {
-			copy_bundled_assets_to(writable_root);
-		}
+		/*
+		 * Run on every launch: each app update installs the bundle at a new
+		 * path, so the links to its large files must be refreshed.
+		 */
+		sync_bundled_assets_to(writable_root);
 		if (use_resource_root(writable_root)) {
 			return;
 		}
