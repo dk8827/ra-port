@@ -24,7 +24,7 @@ struct MobileZoomRect {
 
 /*
  * The last known position of up to two fingers, in window pixels, plus what
- * is needed to recognise a quick two-finger tap (which resets the zoom).
+ * is needed to recognise a quick two- or three-finger tap.
  */
 struct MobilePinchState {
 	int active[2];
@@ -34,6 +34,8 @@ struct MobilePinchState {
 	int pair_valid;
 	unsigned long pair_tick;
 	float pair_travel;
+	int down_count;
+	int max_down;
 };
 
 static const float MobileZoom_MaxScale = 3.0f;
@@ -207,6 +209,8 @@ static inline void MobilePinch_Init(MobilePinchState *pinch)
 	pinch->pair_valid = 0;
 	pinch->pair_tick = 0;
 	pinch->pair_travel = 0.0f;
+	pinch->down_count = 0;
+	pinch->max_down = 0;
 }
 
 static inline int MobilePinch_Slot(MobilePinchState const *pinch, long long finger)
@@ -229,6 +233,10 @@ static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, f
 	if (!pinch || MobilePinch_Slot(pinch, finger) >= 0) {
 		return;
 	}
+	pinch->down_count++;
+	if (pinch->down_count > pinch->max_down) {
+		pinch->max_down = pinch->down_count;
+	}
 	for (int index = 0; index < 2; ++index) {
 		if (!pinch->active[index]) {
 			pinch->active[index] = 1;
@@ -246,17 +254,21 @@ static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, f
 }
 
 /*
- * Call when a finger of the pair lifts, before MobilePinch_Up. Returns 1 if
- * the pair was a quick tap: both fingers down briefly and barely moved.
+ * Call when the first finger of a multi-finger touch lifts, before
+ * MobilePinch_Up. If the touch was a quick tap (fingers down briefly and
+ * barely moving), returns how many fingers it used: 2 or 3. Otherwise 0.
  */
-static inline int MobilePinch_EndIsTap(MobilePinchState *pinch, unsigned long tick)
+static inline int MobilePinch_EndTapFingers(MobilePinchState *pinch, unsigned long tick)
 {
 	if (!pinch || !MobilePinch_BothActive(pinch) || !pinch->pair_valid) {
 		return 0;
 	}
 	pinch->pair_valid = 0;
-	return (unsigned long)(tick - pinch->pair_tick) <= MobilePinch_TapMs &&
-		pinch->pair_travel <= MobilePinch_TapTravel;
+	if ((unsigned long)(tick - pinch->pair_tick) > MobilePinch_TapMs ||
+			pinch->pair_travel > MobilePinch_TapTravel) {
+		return 0;
+	}
+	return pinch->max_down >= 3 ? 3 : 2;
 }
 
 static inline void MobilePinch_Up(MobilePinchState *pinch, long long finger)
@@ -267,6 +279,12 @@ static inline void MobilePinch_Up(MobilePinchState *pinch, long long finger)
 	int slot = MobilePinch_Slot(pinch, finger);
 	if (slot >= 0) {
 		pinch->active[slot] = 0;
+	}
+	if (pinch->down_count > 0) {
+		pinch->down_count--;
+	}
+	if (pinch->down_count == 0) {
+		pinch->max_down = 0;
 	}
 }
 

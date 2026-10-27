@@ -755,9 +755,17 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = 0;
 				int y = 0;
 				if (MobilePinch_BothActive(&MobilePinch)) {
-					if (MobilePinch_EndIsTap(&MobilePinch, mac_now_ms())) {
-						/* A quick two-finger tap shows the whole frame again. */
+					int tap_fingers = MobilePinch_EndTapFingers(&MobilePinch, mac_now_ms());
+					if (tap_fingers == 3) {
+						/* A quick three-finger tap shows the whole frame again. */
 						MobileZoom_Init(&MobileZoom);
+					} else if (tap_fingers == 2 && MobileTouch.primary_active) {
+						/* A quick two-finger tap is a right click, which deselects units. */
+						MobileTouchGestureOutput out;
+						MobileTouchGesture_ClearOutput(&out);
+						MobileTouchGesture_Add(&out, MOBILE_TOUCH_RIGHT_DOWN, MobileTouch.last_x, MobileTouch.last_y, 0);
+						MobileTouchGesture_Add(&out, MOBILE_TOUCH_RIGHT_UP, MobileTouch.last_x, MobileTouch.last_y, 0);
+						mobile_queue_touch_output(&out);
 					} else {
 						MobileZoom_SnapIfNearlyUnzoomed(&MobileZoom);
 					}

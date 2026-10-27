@@ -144,9 +144,27 @@ static void test_quick_still_two_finger_tap_is_recognised(void)
 	MobilePinch_Init(&pinch);
 	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
 	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1020);
-	assert(MobilePinch_EndIsTap(&pinch, 1200));
+	assert(MobilePinch_EndTapFingers(&pinch, 1200) == 2);
 	/* Only the first lift of the pair counts. */
-	assert(!MobilePinch_EndIsTap(&pinch, 1210));
+	assert(MobilePinch_EndTapFingers(&pinch, 1210) == 0);
+}
+
+static void test_three_finger_tap_is_counted(void)
+{
+	MobilePinchState pinch;
+	MobilePinch_Init(&pinch);
+	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
+	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1010);
+	MobilePinch_Down(&pinch, 3, 300.0f, 100.0f, 1030);
+	assert(MobilePinch_EndTapFingers(&pinch, 1200) == 3);
+
+	/* Lifting every finger starts the count afresh for the next touch. */
+	MobilePinch_Up(&pinch, 3);
+	MobilePinch_Up(&pinch, 2);
+	MobilePinch_Up(&pinch, 1);
+	MobilePinch_Down(&pinch, 4, 100.0f, 100.0f, 2000);
+	MobilePinch_Down(&pinch, 5, 200.0f, 100.0f, 2010);
+	assert(MobilePinch_EndTapFingers(&pinch, 2100) == 2);
 }
 
 static void test_slow_or_moving_pair_is_not_a_tap(void)
@@ -157,18 +175,19 @@ static void test_slow_or_moving_pair_is_not_a_tap(void)
 	MobilePinch_Init(&pinch);
 	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
 	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1000);
-	assert(!MobilePinch_EndIsTap(&pinch, 1000 + MobilePinch_TapMs + 1));
+	assert(MobilePinch_EndTapFingers(&pinch, 1000 + MobilePinch_TapMs + 1) == 0);
 
 	MobilePinch_Init(&pinch);
 	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
 	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1000);
 	MobilePinch_Move(&pinch, 2, 260.0f, 100.0f, &ratio, &mid_x, &mid_y, &mid_dx, &mid_dy);
-	assert(!MobilePinch_EndIsTap(&pinch, 1100));
+	assert(MobilePinch_EndTapFingers(&pinch, 1100) == 0);
 }
 
 int main(void)
 {
 	test_quick_still_two_finger_tap_is_recognised();
+	test_three_finger_tap_is_counted();
 	test_slow_or_moving_pair_is_not_a_tap();
 	test_unzoomed_maps_points_unchanged();
 	test_pinch_keeps_focus_point_in_place();
