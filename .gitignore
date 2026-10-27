@@ -60,3 +60,6 @@ HALLFAME.*
 *.swo
 .worktrees/
 docs/superpowers/
+
+# Sideloadable app packages bundle game data.
+*.ipa
