@@ -22,16 +22,24 @@ struct MobileZoomRect {
 	int h;
 };
 
-/* The last known position of up to two fingers, in window pixels. */
+/*
+ * The last known position of up to two fingers, in window pixels, plus what
+ * is needed to recognise a quick two-finger tap (which resets the zoom).
+ */
 struct MobilePinchState {
 	int active[2];
 	long long finger[2];
 	float x[2];
 	float y[2];
+	int pair_valid;
+	unsigned long pair_tick;
+	float pair_travel;
 };
 
 static const float MobileZoom_MaxScale = 3.0f;
 static const float MobileZoom_SnapScale = 1.05f;
+static const unsigned long MobilePinch_TapMs = 300;
+static const float MobilePinch_TapTravel = 20.0f;
 
 static inline float MobileZoom_ClampFloat(float value, float min_value, float max_value)
 {
@@ -196,6 +204,9 @@ static inline void MobilePinch_Init(MobilePinchState *pinch)
 		pinch->x[index] = 0.0f;
 		pinch->y[index] = 0.0f;
 	}
+	pinch->pair_valid = 0;
+	pinch->pair_tick = 0;
+	pinch->pair_travel = 0.0f;
 }
 
 static inline int MobilePinch_Slot(MobilePinchState const *pinch, long long finger)
@@ -213,7 +224,7 @@ static inline int MobilePinch_BothActive(MobilePinchState const *pinch)
 	return pinch && pinch->active[0] && pinch->active[1];
 }
 
-static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, float x, float y)
+static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, float x, float y, unsigned long tick)
 {
 	if (!pinch || MobilePinch_Slot(pinch, finger) >= 0) {
 		return;
@@ -224,9 +235,28 @@ static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, f
 			pinch->finger[index] = finger;
 			pinch->x[index] = x;
 			pinch->y[index] = y;
+			if (MobilePinch_BothActive(pinch)) {
+				pinch->pair_valid = 1;
+				pinch->pair_tick = tick;
+				pinch->pair_travel = 0.0f;
+			}
 			return;
 		}
 	}
+}
+
+/*
+ * Call when a finger of the pair lifts, before MobilePinch_Up. Returns 1 if
+ * the pair was a quick tap: both fingers down briefly and barely moved.
+ */
+static inline int MobilePinch_EndIsTap(MobilePinchState *pinch, unsigned long tick)
+{
+	if (!pinch || !MobilePinch_BothActive(pinch) || !pinch->pair_valid) {
+		return 0;
+	}
+	pinch->pair_valid = 0;
+	return (unsigned long)(tick - pinch->pair_tick) <= MobilePinch_TapMs &&
+		pinch->pair_travel <= MobilePinch_TapTravel;
 }
 
 static inline void MobilePinch_Up(MobilePinchState *pinch, long long finger)
@@ -284,6 +314,9 @@ static inline int MobilePinch_Move(
 		distance_ratio = sqrtf(new_dist_sq / old_dist_sq);
 	}
 
+	float moved_x = x - pinch->x[slot];
+	float moved_y = y - pinch->y[slot];
+	pinch->pair_travel += (moved_x < 0.0f ? -moved_x : moved_x) + (moved_y < 0.0f ? -moved_y : moved_y);
 	pinch->x[slot] = x;
 	pinch->y[slot] = y;
 	if (ratio) *ratio = distance_ratio;

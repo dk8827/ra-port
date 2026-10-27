@@ -116,10 +116,10 @@ static void test_pinch_reports_spread_and_midpoint(void)
 	float mid_dx = 0.0f;
 	float mid_dy = 0.0f;
 
-	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f);
+	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
 	assert(!MobilePinch_Move(&pinch, 1, 100.0f, 100.0f, &ratio, &mid_x, &mid_y, &mid_dx, &mid_dy));
 
-	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f);
+	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1000);
 	assert(MobilePinch_BothActive(&pinch));
 
 	/* Finger 2 moves 100 further away: distance 100 -> 200, midpoint 150 -> 200. */
@@ -138,8 +138,38 @@ static void test_pinch_reports_spread_and_midpoint(void)
 	assert(!MobilePinch_Move(&pinch, 2, 310.0f, 130.0f, &ratio, &mid_x, &mid_y, &mid_dx, &mid_dy));
 }
 
+static void test_quick_still_two_finger_tap_is_recognised(void)
+{
+	MobilePinchState pinch;
+	MobilePinch_Init(&pinch);
+	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
+	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1020);
+	assert(MobilePinch_EndIsTap(&pinch, 1200));
+	/* Only the first lift of the pair counts. */
+	assert(!MobilePinch_EndIsTap(&pinch, 1210));
+}
+
+static void test_slow_or_moving_pair_is_not_a_tap(void)
+{
+	MobilePinchState pinch;
+	float ratio, mid_x, mid_y, mid_dx, mid_dy;
+
+	MobilePinch_Init(&pinch);
+	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
+	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1000);
+	assert(!MobilePinch_EndIsTap(&pinch, 1000 + MobilePinch_TapMs + 1));
+
+	MobilePinch_Init(&pinch);
+	MobilePinch_Down(&pinch, 1, 100.0f, 100.0f, 1000);
+	MobilePinch_Down(&pinch, 2, 200.0f, 100.0f, 1000);
+	MobilePinch_Move(&pinch, 2, 260.0f, 100.0f, &ratio, &mid_x, &mid_y, &mid_dx, &mid_dy);
+	assert(!MobilePinch_EndIsTap(&pinch, 1100));
+}
+
 int main(void)
 {
+	test_quick_still_two_finger_tap_is_recognised();
+	test_slow_or_moving_pair_is_not_a_tap();
 	test_unzoomed_maps_points_unchanged();
 	test_pinch_keeps_focus_point_in_place();
 	test_scale_is_clamped();

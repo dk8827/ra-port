@@ -713,7 +713,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				float window_x = 0.0f;
 				float window_y = 0.0f;
 				mobile_window_point(event.tfinger.x, event.tfinger.y, &window_x, &window_y);
-				MobilePinch_Down(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y);
+				MobilePinch_Down(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y, mac_now_ms());
 				MobileTouchGestureOutput out;
 				MobileTouchGesture_Begin(&MobileTouch, (long long)event.tfinger.fingerId, x, y, mac_now_ms(), &out);
 				if (MobileTouch.secondary_active && MobileTouch.secondary_finger == (long long)event.tfinger.fingerId) {
@@ -755,7 +755,12 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = 0;
 				int y = 0;
 				if (MobilePinch_BothActive(&MobilePinch)) {
-					MobileZoom_SnapIfNearlyUnzoomed(&MobileZoom);
+					if (MobilePinch_EndIsTap(&MobilePinch, mac_now_ms())) {
+						/* A quick two-finger tap shows the whole frame again. */
+						MobileZoom_Init(&MobileZoom);
+					} else {
+						MobileZoom_SnapIfNearlyUnzoomed(&MobileZoom);
+					}
 				}
 				MobilePinch_Up(&MobilePinch, (long long)event.tfinger.fingerId);
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
