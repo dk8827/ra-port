@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.raport.redalert</string>
+	<string>${RA95_IOS_BUNDLE_ID}</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
