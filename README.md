@@ -308,6 +308,20 @@ Command+Return on macOS
 Alt+Return on Linux
 ```
 
+## Touch Controls
+
+On Android and iOS:
+
+| Gesture | Action |
+| --- | --- |
+| Tap | Left click |
+| Drag | Left-button drag, e.g. a selection box |
+| Long press or quick two-finger tap | Right click, e.g. deselect units |
+| Two-finger drag | Scroll the map, or move the magnified view when zoomed in |
+| Pinch | Magnify the screen, up to 3x |
+| Quick three-finger tap | Show the whole screen again |
+| Tap during a movie | Skip the movie |
+
 ## Tests
 
 Run the source-level tests and script checks:

@@ -475,6 +475,10 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
 "$tmpdir/mobile_pan_test"
 
 "${cxx_cmd[@]}" "${inc_port[@]}" \
+  "$ROOT_DIR/tests/mobile_zoom_test.cpp" -o "$tmpdir/mobile_zoom_test"
+"$tmpdir/mobile_zoom_test"
+
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_key_message_test.cpp" -o "$tmpdir/mobile_key_message_test"
 "$tmpdir/mobile_key_message_test"
 
