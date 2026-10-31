@@ -449,7 +449,7 @@ static void mobile_emit_pan(float dx, float dy)
  * view can't absorb (always, when unzoomed) scrolls the map as before.
  * Positions are in window pixels.
  */
-static void mobile_handle_pinch(float ratio, float mid_x, float mid_y, float mid_dx, float mid_dy)
+static void mobile_handle_pinch(float scale, float mid_x, float mid_y, float mid_dx, float mid_dy)
 {
 	int window_w = MacWidth;
 	int window_h = MacHeight;
@@ -464,7 +464,7 @@ static void mobile_handle_pinch(float ratio, float mid_x, float mid_y, float mid
 	if (mobile_zoom_applies()) {
 		float focus_x = (mid_x - (float)viewport.x) * logical_per_px_x;
 		float focus_y = (mid_y - (float)viewport.y) * logical_per_px_y;
-		MobileZoom_Pinch(&MobileZoom, ratio, focus_x, focus_y, MacWidth, MacHeight);
+		MobileZoom_Pinch(&MobileZoom, scale / MobileZoom.scale, focus_x, focus_y, MacWidth, MacHeight);
 	}
 
 	float rest_x = 0.0f;
@@ -713,7 +713,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				float window_x = 0.0f;
 				float window_y = 0.0f;
 				mobile_window_point(event.tfinger.x, event.tfinger.y, &window_x, &window_y);
-				MobilePinch_Down(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y, mac_now_ms());
+				MobilePinch_Down(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y, mac_now_ms(), MobileZoom.scale);
 				MobileTouchGestureOutput out;
 				MobileTouchGesture_Begin(&MobileTouch, (long long)event.tfinger.fingerId, x, y, mac_now_ms(), &out);
 				if (MobileTouch.secondary_active && MobileTouch.secondary_finger == (long long)event.tfinger.fingerId) {
@@ -729,17 +729,17 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
 				float window_x = 0.0f;
 				float window_y = 0.0f;
-				float ratio = 1.0f;
+				float scale = MobileZoom.scale;
 				float mid_x = 0.0f;
 				float mid_y = 0.0f;
 				float mid_dx = 0.0f;
 				float mid_dy = 0.0f;
 				mobile_window_point(event.tfinger.x, event.tfinger.y, &window_x, &window_y);
 				bool pinch_moved = MobilePinch_Move(&MobilePinch, (long long)event.tfinger.fingerId, window_x, window_y,
-					&ratio, &mid_x, &mid_y, &mid_dx, &mid_dy) != 0;
+					&scale, &mid_x, &mid_y, &mid_dx, &mid_dy) != 0;
 				if (MobileTouchGesture_IsPanFinger(&MobileTouch, (long long)event.tfinger.fingerId)) {
 					if (pinch_moved) {
-						mobile_handle_pinch(ratio, mid_x, mid_y, mid_dx, mid_dy);
+						mobile_handle_pinch(scale, mid_x, mid_y, mid_dx, mid_dy);
 					} else {
 						mobile_emit_pan(event.tfinger.dx, event.tfinger.dy);
 					}

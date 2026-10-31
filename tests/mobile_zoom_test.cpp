@@ -184,8 +184,55 @@ static void test_slow_or_moving_pair_is_not_a_tap(void)
 	assert(MobilePinch_EndTapFingers(&pinch, 1100) == 0);
 }
 
+static void test_parallel_drag_preserves_scale_at_both_limits(void)
+{
+	for (int initial_scale = 1; initial_scale <= 3; ++initial_scale) {
+		for (int direction = -1; direction <= 1; direction += 2) {
+			for (int first = 0; first <= 1; ++first) {
+				MobileZoomState zoom;
+				MobileZoom_Init(&zoom);
+				MobileZoom_Pinch(&zoom, (float)initial_scale, 320, 200, 640, 400);
+				MobilePinchState pinch;
+				MobilePinch_Init(&pinch);
+				MobilePinch_Down(&pinch, 1, 100, 100, 0, zoom.scale);
+				MobilePinch_Down(&pinch, 2, 200, 100, 0, zoom.scale);
+				for (int step = 1; step <= 5; ++step) {
+					for (int event = 0; event < 2; ++event) {
+						int finger = ((first + event) % 2) + 1;
+						float scale, x, y, dx, dy, rest_x, rest_y;
+						assert(MobilePinch_Move(&pinch, finger, 100 * finger + direction * 10 * step, 100,
+							&scale, &x, &y, &dx, &dy));
+						MobileZoom_Pinch(&zoom, scale / zoom.scale, x, y, 640, 400);
+						MobileZoom_Pan(&zoom, dx, dy, 640, 400, &rest_x, &rest_y);
+					}
+					assert(approx(zoom.scale, (float)initial_scale));
+				}
+			}
+		}
+	}
+}
+
+static void test_new_pair_uses_current_scale(void)
+{
+	MobilePinchState pinch;
+	MobilePinch_Init(&pinch);
+	MobilePinch_Down(&pinch, 1, 100, 100, 0, 2.0f);
+	MobilePinch_Down(&pinch, 2, 200, 100, 0, 2.0f);
+	float scale;
+	MobilePinch_Move(&pinch, 2, 250, 100, &scale, 0, 0, 0, 0);
+	assert(approx(scale, 3.0f));
+	MobilePinch_Move(&pinch, 2, 200, 100, &scale, 0, 0, 0, 0);
+	assert(approx(scale, 2.0f));
+	MobilePinch_Up(&pinch, 2);
+	MobilePinch_Down(&pinch, 3, 200, 100, 1000, scale);
+	MobilePinch_Move(&pinch, 3, 150, 100, &scale, 0, 0, 0, 0);
+	assert(approx(scale, 1.0f));
+}
+
 int main(void)
 {
+	test_parallel_drag_preserves_scale_at_both_limits();
+	test_new_pair_uses_current_scale();
 	test_quick_still_two_finger_tap_is_recognised();
 	test_three_finger_tap_is_counted();
 	test_slow_or_moving_pair_is_not_a_tap();

@@ -34,6 +34,8 @@ struct MobilePinchState {
 	int pair_valid;
 	unsigned long pair_tick;
 	float pair_travel;
+	float pair_distance;
+	float pair_scale;
 	int down_count;
 	int max_down;
 };
@@ -209,6 +211,8 @@ static inline void MobilePinch_Init(MobilePinchState *pinch)
 	pinch->pair_valid = 0;
 	pinch->pair_tick = 0;
 	pinch->pair_travel = 0.0f;
+	pinch->pair_distance = 0.0f;
+	pinch->pair_scale = 1.0f;
 	pinch->down_count = 0;
 	pinch->max_down = 0;
 }
@@ -228,7 +232,7 @@ static inline int MobilePinch_BothActive(MobilePinchState const *pinch)
 	return pinch && pinch->active[0] && pinch->active[1];
 }
 
-static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, float x, float y, unsigned long tick)
+static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, float x, float y, unsigned long tick, float scale = 1.0f)
 {
 	if (!pinch || MobilePinch_Slot(pinch, finger) >= 0) {
 		return;
@@ -247,6 +251,10 @@ static inline void MobilePinch_Down(MobilePinchState *pinch, long long finger, f
 				pinch->pair_valid = 1;
 				pinch->pair_tick = tick;
 				pinch->pair_travel = 0.0f;
+				float dx = pinch->x[0] - pinch->x[1];
+				float dy = pinch->y[0] - pinch->y[1];
+				pinch->pair_distance = sqrtf(dx * dx + dy * dy);
+				pinch->pair_scale = scale;
 			}
 			return;
 		}
@@ -290,15 +298,18 @@ static inline void MobilePinch_Up(MobilePinchState *pinch, long long finger)
 
 /*
  * Record a finger move. When both fingers are down, returns 1 and reports how
- * the pair changed: the distance ratio (new / old), the old midpoint, and how
+ * the pair changed: the target scale, the old midpoint, and how
  * far the midpoint moved, all in the same units as the positions.
+ * Scale is relative to the start of the pair. Incrementally multiplying a
+ * clamped scale loses motion at the limits when finger events arrive one at
+ * a time, making a parallel drag permanently change the magnification.
  */
 static inline int MobilePinch_Move(
 	MobilePinchState *pinch,
 	long long finger,
 	float x,
 	float y,
-	float *ratio,
+	float *scale,
 	float *mid_x,
 	float *mid_y,
 	float *mid_dx,
@@ -318,18 +329,17 @@ static inline int MobilePinch_Move(
 	}
 
 	int other = 1 - slot;
-	float old_dx = pinch->x[slot] - pinch->x[other];
-	float old_dy = pinch->y[slot] - pinch->y[other];
 	float new_dx = x - pinch->x[other];
 	float new_dy = y - pinch->y[other];
-	float old_dist_sq = old_dx * old_dx + old_dy * old_dy;
 	float new_dist_sq = new_dx * new_dx + new_dy * new_dy;
 	float old_mid_x = (pinch->x[slot] + pinch->x[other]) / 2.0f;
 	float old_mid_y = (pinch->y[slot] + pinch->y[other]) / 2.0f;
 
-	float distance_ratio = 1.0f;
-	if (old_dist_sq > 1.0f && new_dist_sq > 1.0f) {
-		distance_ratio = sqrtf(new_dist_sq / old_dist_sq);
+	float target_scale = pinch->pair_scale;
+	if (pinch->pair_distance > 1.0f) {
+		target_scale *= sqrtf(new_dist_sq) / pinch->pair_distance;
+	} else if (new_dist_sq > 1.0f) {
+		pinch->pair_distance = sqrtf(new_dist_sq);
 	}
 
 	float moved_x = x - pinch->x[slot];
@@ -337,7 +347,7 @@ static inline int MobilePinch_Move(
 	pinch->pair_travel += (moved_x < 0.0f ? -moved_x : moved_x) + (moved_y < 0.0f ? -moved_y : moved_y);
 	pinch->x[slot] = x;
 	pinch->y[slot] = y;
-	if (ratio) *ratio = distance_ratio;
+	if (scale) *scale = MobileZoom_ClampFloat(target_scale, 1.0f, MobileZoom_MaxScale);
 	if (mid_x) *mid_x = old_mid_x;
 	if (mid_y) *mid_y = old_mid_y;
 	if (mid_dx) *mid_dx = (x + pinch->x[other]) / 2.0f - old_mid_x;
