@@ -69,7 +69,10 @@ int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_leng
 			offset = source_ptr[source_pos] + ((unsigned long)source_ptr[source_pos + 1] << 8);
 			source_pos += 2;
 		}
-		if (offset >= dest_pos || count > dest_length - dest_pos) return 0;
+		/* VQA deltas may copy from the previous frame, including bytes at
+		** or beyond the current write cursor. Bound both ranges, not their
+		** relative positions; the destination is initialized by the caller. */
+		if (offset > dest_length || count > dest_length - offset || count > dest_length - dest_pos) return 0;
 		while (count--) dest_ptr[dest_pos++] = dest_ptr[offset++];
 	}
 
