@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "" FORCE)
 endif()
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
@@ -63,6 +63,7 @@ if(NOT DEFINED RA95_IOS_BUILD_NUMBER)
 endif()
 message(STATUS "Red Alert iOS version ${RA95_IOS_VERSION} (${RA95_IOS_BUILD_NUMBER}), commit ${RA95_GIT_COMMIT}")
 
+set(RA95_IOS_BUNDLE_ID "com.raport.redalert" CACHE STRING "iOS bundle identifier; device builds need one your Apple team can register.")
 set(RA95_IOS_BUNDLED_ASSETS_DIR "${CMAKE_CURRENT_LIST_DIR}/../assets/redalert" CACHE PATH "Local Red Alert assets to bundle into the iOS debug app.")
 
 if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/third_party/SDL/CMakeLists.txt")
@@ -121,7 +122,7 @@ set_target_properties(redalert_ios PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist.in"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.raport.redalert"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${RA95_IOS_BUNDLE_ID}"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
 )
 
