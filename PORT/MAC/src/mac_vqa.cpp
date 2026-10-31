@@ -11,7 +11,7 @@
 #include "../include/mac_audio_stream.h"
 #include "../include/mac_sdl_runtime.h"
 
-extern "C" unsigned long __cdecl LCW_Uncompress(void *source, void *dest, unsigned long length);
+extern "C" int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_length, void *dest, unsigned long dest_length, unsigned long *written);
 void Flag_To_Set_Palette(unsigned char *palette, long numbytes, unsigned long slowpal);
 
 struct MacVQAChunk {
@@ -101,6 +101,11 @@ struct MacVQAState {
 
 static MacVQAState *MacVQAStates = 0;
 static bool MacVQAAudioPaused = false;
+
+// ponytail: legacy VQA files are tiny; raise these caps if a verified asset needs more.
+static unsigned long const VQA_MAX_FILE_SIZE = 256UL * 1024UL * 1024UL;
+static unsigned long const VQA_MAX_CHUNK_SIZE = 16UL * 1024UL * 1024UL;
+static unsigned long const VQA_MAX_IMAGE_DIMENSION = 4096UL;
 
 static unsigned short vqa_u16le(unsigned char const *data)
 {
@@ -249,6 +254,9 @@ static bool vqa_read_chunk(MacVQAState *state, MacVQAChunk *chunk)
 
 static bool vqa_read_chunk_data(MacVQAState *state, MacVQAChunk const &chunk, std::vector<unsigned char> &data)
 {
+	if (chunk.size > VQA_MAX_CHUNK_SIZE) {
+		return false;
+	}
 	data.resize(chunk.size);
 	if (chunk.size != 0 && !vqa_read(state, &data[0], chunk.size)) {
 		return false;
@@ -257,6 +265,17 @@ static bool vqa_read_chunk_data(MacVQAState *state, MacVQAChunk const &chunk, st
 		return false;
 	}
 	return true;
+}
+
+static bool vqa_chunk_fits(MacVQAState *state, MacVQAChunk const &chunk, unsigned long end)
+{
+	return state && state->file_pos <= end && vqa_pad(chunk.size) <= end - state->file_pos && chunk.size <= VQA_MAX_CHUNK_SIZE;
+}
+
+static bool vqa_lcw_uncompress(std::vector<unsigned char> const &source, std::vector<unsigned char> &dest, unsigned long *written)
+{
+	if (source.empty() || dest.empty()) return false;
+	return LCW_Uncompress_Bounded(&source[0], (unsigned long)source.size(), &dest[0], (unsigned long)dest.size(), written) != 0;
 }
 
 static bool vqa_skip_chunk_data(MacVQAState *state, MacVQAChunk const &chunk)
@@ -552,10 +571,10 @@ static bool vqa_load_audio_snd2(MacVQAState *state, MacVQAChunk const &chunk)
 	return true;
 }
 
-extern "C" void MacVQA_UnVQ4x2(unsigned char const *codebook, unsigned char const *pointers, unsigned char *buffer, unsigned long blocks_per_row, unsigned long rows, unsigned long buffer_width)
+extern "C" bool MacVQA_UnVQ4x2(unsigned char const *codebook, unsigned long codebook_size, unsigned char const *pointers, unsigned char *buffer, unsigned long blocks_per_row, unsigned long rows, unsigned long buffer_width)
 {
 	if (!codebook || !pointers || !buffer || blocks_per_row == 0 || rows == 0 || buffer_width == 0) {
-		return;
+		return false;
 	}
 
 	unsigned long entries = blocks_per_row * rows;
@@ -573,11 +592,13 @@ extern "C" void MacVQA_UnVQ4x2(unsigned char const *codebook, unsigned char cons
 				dst1[0] = dst1[1] = dst1[2] = dst1[3] = low;
 			} else {
 				unsigned long codebook_index = (((unsigned long)high << 8) | low) * 8UL;
+				if (codebook_index > codebook_size || 8UL > codebook_size - codebook_index) return false;
 				memcpy(dst0, codebook + codebook_index, 4);
 				memcpy(dst1, codebook + codebook_index + 4, 4);
 			}
 		}
 	}
+	return true;
 }
 
 static void vqa_apply_palette(MacVQAState *state, bool force_fallback)
@@ -618,7 +639,8 @@ static bool vqa_load_codebook(MacVQAState *state, MacVQAChunk const &chunk, bool
 		state->partial_compressed = false;
 		if (compressed) {
 			if (!data.empty()) {
-				LCW_Uncompress(&data[0], &state->codebook[0], (unsigned long)state->codebook.size());
+				unsigned long written = 0;
+				if (!vqa_lcw_uncompress(data, state->codebook, &written)) return false;
 			}
 		} else {
 			unsigned long count = std::min((unsigned long)data.size(), (unsigned long)state->codebook.size());
@@ -640,6 +662,7 @@ static bool vqa_load_codebook(MacVQAState *state, MacVQAChunk const &chunk, bool
 	}
 	if (!data.empty()) {
 		size_t old_size = state->partial_codebook.size();
+		if (old_size > VQA_MAX_CHUNK_SIZE || data.size() > VQA_MAX_CHUNK_SIZE - old_size) return false;
 		state->partial_codebook.resize(old_size + data.size());
 		memcpy(&state->partial_codebook[old_size], &data[0], data.size());
 	}
@@ -649,7 +672,8 @@ static bool vqa_load_codebook(MacVQAState *state, MacVQAChunk const &chunk, bool
 	if (state->partial_count >= group_size) {
 		if (!state->partial_codebook.empty()) {
 			if (compressed) {
-				LCW_Uncompress(&state->partial_codebook[0], &state->codebook[0], (unsigned long)state->codebook.size());
+				unsigned long written = 0;
+				if (!vqa_lcw_uncompress(state->partial_codebook, state->codebook, &written)) return false;
 			} else {
 				unsigned long count = std::min((unsigned long)state->partial_codebook.size(), (unsigned long)state->codebook.size());
 				memcpy(&state->codebook[0], &state->partial_codebook[0], count);
@@ -672,7 +696,9 @@ static bool vqa_load_palette(MacVQAState *state, MacVQAChunk const &chunk, bool 
 		state->palette.resize(768);
 	}
 	if (compressed) {
-		state->palette_size = data.empty() ? 0 : (long)LCW_Uncompress(&data[0], &state->palette[0], (unsigned long)state->palette.size());
+		unsigned long written = 0;
+		if (!vqa_lcw_uncompress(data, state->palette, &written)) return false;
+		state->palette_size = (long)written;
 	} else {
 		state->palette_size = (long)std::min((unsigned long)data.size(), (unsigned long)state->palette.size());
 		if (state->palette_size > 0) {
@@ -692,9 +718,8 @@ static bool vqa_load_pointers(MacVQAState *state, MacVQAChunk const &chunk, bool
 		return false;
 	}
 	if (compressed) {
-		if (!data.empty()) {
-			LCW_Uncompress(&data[0], &state->pointers[0], (unsigned long)state->pointers.size());
-		}
+		unsigned long written = 0;
+		if (!vqa_lcw_uncompress(data, state->pointers, &written)) return false;
 	} else {
 		unsigned long count = std::min((unsigned long)data.size(), (unsigned long)state->pointers.size());
 		if (count) {
@@ -732,6 +757,7 @@ static bool vqa_process_container(MacVQAState *state, MacVQAChunk const &contain
 		if (!vqa_read_chunk(state, &chunk)) {
 			return false;
 		}
+		if (!vqa_chunk_fits(state, chunk, end)) return false;
 		if (!vqa_process_video_chunk(state, chunk, have_pointers, palette_changed)) {
 			return false;
 		}
@@ -755,6 +781,7 @@ static bool vqa_process_frame_range(MacVQAState *state, unsigned long start, uns
 		if (!vqa_read_chunk(state, &chunk)) {
 			return false;
 		}
+		if (!vqa_chunk_fits(state, chunk, end)) return false;
 		if (vqa_id_is(chunk.id, "VQFR") || vqa_id_is(chunk.id, "VQFK")) {
 			if (!vqa_process_container(state, chunk, have_pointers, palette_changed)) {
 				return false;
@@ -771,12 +798,12 @@ static bool vqa_process_frame_range(MacVQAState *state, unsigned long start, uns
 	return true;
 }
 
-static void vqa_decode_to_buffer(MacVQAState *state, std::vector<unsigned char> const &frame_codebook)
+static bool vqa_decode_to_buffer(MacVQAState *state, std::vector<unsigned char> const &frame_codebook)
 {
 	int target_w = state->config.ImageWidth > 0 ? (int)state->config.ImageWidth : (int)state->header.ImageWidth;
 	int target_h = state->config.ImageHeight > 0 ? (int)state->config.ImageHeight : (int)state->header.ImageHeight;
 	if (target_w <= 0 || target_h <= 0) {
-		return;
+		return false;
 	}
 
 	unsigned char *dest = state->config.ImageBuf;
@@ -795,10 +822,12 @@ static void vqa_decode_to_buffer(MacVQAState *state, std::vector<unsigned char> 
 		if (x < 0) x = 0;
 		if (y < 0) y = 0;
 	}
+	if ((unsigned long)x + state->header.ImageWidth > (unsigned long)target_w || (unsigned long)y + state->header.ImageHeight > (unsigned long)target_h) return false;
 
 	unsigned long blocks_per_row = state->header.ImageWidth / state->header.BlockWidth;
 	unsigned long rows = state->header.ImageHeight / state->header.BlockHeight;
-	MacVQA_UnVQ4x2(frame_codebook.empty() ? &state->codebook[0] : &frame_codebook[0], &state->pointers[0], dest + y * target_w + x, blocks_per_row, rows, (unsigned long)target_w);
+	std::vector<unsigned char> const &active_codebook = frame_codebook.empty() ? state->codebook : frame_codebook;
+	return MacVQA_UnVQ4x2(&active_codebook[0], (unsigned long)active_codebook.size(), &state->pointers[0], dest + y * target_w + x, blocks_per_row, rows, (unsigned long)target_w);
 }
 
 static bool vqa_present_or_callback(MacVQAState *state)
@@ -985,6 +1014,10 @@ long VQA_Open(VQAHandle *handle, char const *filename, VQAConfig *config)
 		return VQAERR_NOTVQA;
 	}
 	state->form_end = vqa_u32be(form + 4) + 8UL;
+	if (state->form_end < sizeof(form) || state->form_end > VQA_MAX_FILE_SIZE) {
+		vqa_close_stream(state);
+		return VQAERR_NOTVQA;
+	}
 
 	bool found_header = false;
 	bool found_finf = false;
@@ -993,6 +1026,10 @@ long VQA_Open(VQAHandle *handle, char const *filename, VQAConfig *config)
 		if (!vqa_read_chunk(state, &chunk)) {
 			vqa_close_stream(state);
 			return VQAERR_READ;
+		}
+		if (!vqa_chunk_fits(state, chunk, state->form_end)) {
+			vqa_close_stream(state);
+			return VQAERR_NOTVQA;
 		}
 
 		std::vector<unsigned char> data;
@@ -1021,7 +1058,7 @@ long VQA_Open(VQAHandle *handle, char const *filename, VQAConfig *config)
 		}
 	}
 
-	if (!found_header || !found_finf || state->header.BlockWidth != 4 || state->header.BlockHeight != 2 || state->header.ImageWidth == 0 || state->header.ImageHeight == 0) {
+	if (!found_header || !found_finf || state->header.BlockWidth != 4 || state->header.BlockHeight != 2 || state->header.ImageWidth == 0 || state->header.ImageHeight == 0 || state->header.ImageWidth % 4 != 0 || state->header.ImageHeight % 2 != 0 || state->header.ImageWidth > VQA_MAX_IMAGE_DIMENSION || state->header.ImageHeight > VQA_MAX_IMAGE_DIMENSION || state->config.ImageWidth <= 0 || state->config.ImageHeight <= 0 || state->config.ImageWidth > (long)VQA_MAX_IMAGE_DIMENSION || state->config.ImageHeight > (long)VQA_MAX_IMAGE_DIMENSION || state->header.ImageWidth > (unsigned long)state->config.ImageWidth || state->header.ImageHeight > (unsigned long)state->config.ImageHeight) {
 		vqa_close_stream(state);
 		return VQAERR_NOTVQA;
 	}
@@ -1105,7 +1142,10 @@ long VQA_Play(VQAHandle *handle, long mode)
 			vqa_apply_palette(state, false);
 		}
 		if (have_pointers) {
-			vqa_decode_to_buffer(state, frame_codebook);
+			if (!vqa_decode_to_buffer(state, frame_codebook)) {
+				state->stats.end_time = (long)timeGetTime();
+				return VQAERR_READ;
+			}
 		}
 		bool callback_stop = vqa_present_or_callback(state);
 

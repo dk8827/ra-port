@@ -17,6 +17,12 @@ static unsigned short Read_LE16(void const * ptr)
 	return((unsigned short)(bytes[0] | (bytes[1] << 8)));
 }
 
+static unsigned long Read_LE32(void const * ptr)
+{
+	unsigned char const * bytes = (unsigned char const *)ptr;
+	return((unsigned long)bytes[0] | ((unsigned long)bytes[1] << 8) | ((unsigned long)bytes[2] << 16) | ((unsigned long)bytes[3] << 24));
+}
+
 
 /***********************************************************************************************
  * Small_Icon -- Create a small icon from a big one.                                           *
@@ -186,14 +192,24 @@ long Load_Uncompress(FileClass &file, BuffType &uncomp_buff, BuffType &dest_buff
 	/*
 	**	Read in the size of the file (supposedly).
 	*/
-	file.Read(file_size, sizeof(file_size));
+	if (file.Read(file_size, sizeof(file_size)) != sizeof(file_size)) {
+		if (opened) file.Close();
+		return(0);
+	}
 	size = Read_LE16(file_size);
+	if (size < sizeof(header) || file.Size() < (long)size + (long)sizeof(file_size)) {
+		if (opened) file.Close();
+		return(0);
+	}
 
 	/*
 	**	Read in the header block. This block contains the compression type
 	**	and skip data (among other things).
 	*/
-	file.Read(&header, sizeof(header));
+	if (file.Read(&header, sizeof(header)) != sizeof(header)) {
+		if (opened) file.Close();
+		return(0);
+	}
 	size -= sizeof(header);
 
 	/*
@@ -203,11 +219,21 @@ long Load_Uncompress(FileClass &file, BuffType &uncomp_buff, BuffType &dest_buff
 	*/
 	skip = Read_LE16(header + 6);
 	if (skip) {
+		if (skip > size || (reserved_data && skip > 768)) {
+			if (opened) file.Close();
+			return(0);
+		}
 		size -= skip;
 		if (reserved_data) {
-			file.Read(reserved_data, skip);
+			if (file.Read(reserved_data, skip) != skip) {
+				if (opened) file.Close();
+				return(0);
+			}
 		} else {
-			file.Seek(skip, SEEK_CUR);
+			if (file.Seek(skip, SEEK_CUR) < 0) {
+				if (opened) file.Close();
+				return(0);
+			}
 		}
 		header[6] = 0;
 		header[7] = 0;
@@ -218,6 +244,10 @@ long Load_Uncompress(FileClass &file, BuffType &uncomp_buff, BuffType &dest_buff
 	**	specified are identical, then the data should be loaded at the end of
 	**	the buffer and decompressed at the beginning.
 	*/
+	if ((long)size + (long)sizeof(header) > uncomp_buff.Get_Size() || Read_LE32(header + 2) > (unsigned long)dest_buff.Get_Size()) {
+		if (opened) file.Close();
+		return(0);
+	}
 	if (uncomp_buff.Get_Buffer() == dest_buff.Get_Buffer()) {
 		sptr = (char *)sptr + uncomp_buff.Get_Size()-(size+sizeof(header));
 	}
@@ -226,12 +256,15 @@ long Load_Uncompress(FileClass &file, BuffType &uncomp_buff, BuffType &dest_buff
 	**	Read in the bulk of the data.
 	*/
 	Mem_Copy(&header, sptr, sizeof(header));
-	file.Read((char *)sptr + sizeof(header), size);
+	if (file.Read((char *)sptr + sizeof(header), size) != size) {
+		if (opened) file.Close();
+		return(0);
+	}
 
 	/*
 	**	Decompress the data.
 	*/
-	size = (unsigned int) Uncompress_Data(sptr, dptr);
+	size = (unsigned int) Uncompress_Data_Bounded(sptr, size + sizeof(header), dptr, dest_buff.Get_Size());
 
 	/*
 	**	Close the file if necessary.

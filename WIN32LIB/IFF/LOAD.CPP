@@ -355,3 +355,31 @@ unsigned long __cdecl Uncompress_Data(void const *src, void *dst)
 	return(uncomp_size);
 }
 
+extern "C" int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_length, void *dest, unsigned long dest_length, unsigned long *written);
+
+unsigned long __cdecl Uncompress_Data_Bounded(void const *src, unsigned long src_size, void *dst, unsigned long dst_size)
+{
+	if (!src || !dst || src_size < 8) return 0;
+
+	unsigned char const *header = (unsigned char const *)src;
+	unsigned long uncomp_size = Read_LE32(header + 2);
+	unsigned long skip = Read_LE16(header + 6);
+	if (uncomp_size == 0 || uncomp_size > dst_size || skip > src_size - 8) return 0;
+
+	unsigned char const *data = header + 8 + skip;
+	unsigned long data_size = src_size - 8 - skip;
+	switch ((CompressionType)header[0]) {
+		case NOCOMPRESS:
+			if (uncomp_size > data_size) return 0;
+			Mem_Copy(data, dst, uncomp_size);
+			return uncomp_size;
+
+		case LCW: {
+			unsigned long written = 0;
+			return LCW_Uncompress_Bounded(data, data_size, dst, dst_size, &written) && written == uncomp_size ? written : 0;
+		}
+
+		default:
+			return 0;
+	}
+}

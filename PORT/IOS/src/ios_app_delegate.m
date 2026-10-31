@@ -26,6 +26,85 @@ static void RedAlertOrientationDebug(char const *message)
 	}
 }
 
+/*
+ * Apps built with the iOS 27 SDK must use the UIScene life cycle or UIKit
+ * refuses to launch them. SDL2 creates its windows with initWithFrame: and
+ * never gives them a scene, so attach each window SDL shows to the app's
+ * window scene. Info.plist.in declares RedAlertSceneDelegate as the scene
+ * delegate.
+ */
+static UIWindowScene *RedAlertWindowScene = nil;
+static NSMutableArray *RedAlertPendingWindows = nil;
+static IMP RedAlertOriginalMakeKeyAndVisible = NULL;
+
+static UIWindowScene *RedAlertFindWindowScene(void)
+{
+	if (RedAlertWindowScene) {
+		return RedAlertWindowScene;
+	}
+	for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+		if ([scene isKindOfClass:[UIWindowScene class]]) {
+			return (UIWindowScene *)scene;
+		}
+	}
+	return nil;
+}
+
+static void RedAlertMakeKeyAndVisible(UIWindow *self, SEL selector)
+{
+	if (!self.windowScene) {
+		UIWindowScene *scene = RedAlertFindWindowScene();
+		if (scene) {
+			self.windowScene = scene;
+		} else {
+			/* The scene has not connected yet; attach this window when it does. */
+			if (!RedAlertPendingWindows) {
+				RedAlertPendingWindows = [[NSMutableArray alloc] init];
+			}
+			[RedAlertPendingWindows addObject:self];
+		}
+	}
+	((void (*)(id, SEL))RedAlertOriginalMakeKeyAndVisible)(self, selector);
+}
+
+@interface RedAlertSceneDelegate : UIResponder <UIWindowSceneDelegate>
+@end
+
+@implementation RedAlertSceneDelegate
+
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
+{
+	if (![scene isKindOfClass:[UIWindowScene class]]) {
+		return;
+	}
+	[RedAlertWindowScene release];
+	RedAlertWindowScene = (UIWindowScene *)[scene retain];
+	for (UIWindow *window in RedAlertPendingWindows) {
+		window.windowScene = RedAlertWindowScene;
+		[window makeKeyAndVisible];
+	}
+	[RedAlertPendingWindows removeAllObjects];
+}
+
+- (void)sceneDidDisconnect:(UIScene *)scene
+{
+	if (scene == RedAlertWindowScene) {
+		[RedAlertWindowScene release];
+		RedAlertWindowScene = nil;
+	}
+}
+
+- (void)sceneDidBecomeActive:(UIScene *)scene
+{
+	/* With scenes, UIKit no longer calls applicationDidBecomeActive: itself. */
+	id<UIApplicationDelegate> delegate = [UIApplication sharedApplication].delegate;
+	if ([delegate respondsToSelector:@selector(applicationDidBecomeActive:)]) {
+		[delegate applicationDidBecomeActive:[UIApplication sharedApplication]];
+	}
+}
+
+@end
+
 @implementation RedAlertIOSDelegate
 
 + (void)load
@@ -35,6 +114,9 @@ static void RedAlertOrientationDebug(char const *message)
 	char const *types = method ? method_getTypeEncoding(method) : "@@:";
 	class_replaceMethod(meta_class, @selector(getAppDelegateClassName), (IMP)RedAlertGetAppDelegateClassName, types);
 	RedAlertOrientationDebug("installed delegate class override");
+
+	Method make_key = class_getInstanceMethod([UIWindow class], @selector(makeKeyAndVisible));
+	RedAlertOriginalMakeKeyAndVisible = method_setImplementation(make_key, (IMP)RedAlertMakeKeyAndVisible);
 }
 
 - (void)redAlert_requestLandscapeGeometry

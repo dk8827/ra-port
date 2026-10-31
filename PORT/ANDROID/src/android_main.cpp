@@ -5,6 +5,7 @@
 #include <string>
 #include <string.h>
 #include <sys/stat.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include <windows.h>
@@ -50,5 +51,21 @@ extern "C" int SDL_main(int argc, char **argv)
         command_line += argv[index];
     }
 
-    return WinMain((HINSTANCE)0, (HINSTANCE)0, command_line.empty() ? (char *)"" : (char *)command_line.c_str(), SW_RESTORE);
+    int result = WinMain((HINSTANCE)0, (HINSTANCE)0, command_line.empty() ? (char *)"" : (char *)command_line.c_str(), SW_RESTORE);
+
+    /*
+    **	The 1996 codebase assumes the process dies when the game exits: it keeps
+    **	global state (_Mouse, Screen, the DirectDraw surfaces, the mixfile heaps)
+    **	that is never torn down or re-initialised. Android, however, keeps the
+    **	process alive after the activity finishes, so launching again re-enters
+    **	SDL_main() against those stale globals and segfaults immediately --
+    **	Block_Mouse() dereferences _Mouse->Screen, which points at freed memory.
+    **
+    **	Terminate the process instead so the next launch starts clean. _exit()
+    **	rather than exit() because the static destructors belong to that same
+    **	un-resettable global state and are not safe to run here; flush first so
+    **	anything the game buffered on the way out still lands.
+    */
+    fflush(NULL);
+    _exit(result);
 }

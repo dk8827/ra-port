@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "" FORCE)
 endif()
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
@@ -21,6 +21,49 @@ set(SDL_TESTS OFF CACHE BOOL "" FORCE)
 set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
 set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
 
+set(RA95_IOS_VERSION "0.1.0" CACHE STRING "App version shown to users (CFBundleShortVersionString); bump by hand for releases.")
+
+# The build number (CFBundleVersion) must grow with every build iOS and sideloading tools see as
+# an update. Use the number of commits on the current branch, so each new commit builds a higher
+# number. Pass -DRA95_IOS_BUILD_NUMBER=N to override it.
+set(RA95_GIT_COMMIT "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-list --count HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/.."
+        OUTPUT_VARIABLE RA95_GIT_COMMIT_COUNT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short=12 HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/.."
+        OUTPUT_VARIABLE RA95_GIT_HEAD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" status --porcelain --untracked-files=no
+        WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/.."
+        OUTPUT_VARIABLE RA95_GIT_CHANGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+    if(RA95_GIT_HEAD)
+        set(RA95_GIT_COMMIT "${RA95_GIT_HEAD}")
+        if(RA95_GIT_CHANGES)
+            string(APPEND RA95_GIT_COMMIT "-dirty")
+        endif()
+    endif()
+endif()
+if(NOT DEFINED RA95_IOS_BUILD_NUMBER)
+    if(RA95_GIT_COMMIT_COUNT MATCHES "^[0-9]+$")
+        set(RA95_IOS_BUILD_NUMBER "${RA95_GIT_COMMIT_COUNT}")
+    else()
+        set(RA95_IOS_BUILD_NUMBER "1")
+    endif()
+endif()
+message(STATUS "Red Alert iOS version ${RA95_IOS_VERSION} (${RA95_IOS_BUILD_NUMBER}), commit ${RA95_GIT_COMMIT}")
+
+set(RA95_IOS_BUNDLE_ID "com.raport.redalert" CACHE STRING "iOS bundle identifier; device builds need one your Apple team can register.")
 set(RA95_IOS_BUNDLED_ASSETS_DIR "${CMAKE_CURRENT_LIST_DIR}/../assets/redalert" CACHE PATH "Local Red Alert assets to bundle into the iOS debug app.")
 
 if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/third_party/SDL/CMakeLists.txt")
@@ -79,7 +122,7 @@ set_target_properties(redalert_ios PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist.in"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.raport.redalert"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${RA95_IOS_BUNDLE_ID}"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
 )
 

@@ -288,6 +288,12 @@ Build a signed device app for iPhone or iPad:
 RA_IOS_DEVELOPMENT_TEAM=TEAMID scripts/build_ios_debug.sh --device
 ```
 
+The default bundle identifier, `com.raport.redalert`, can only be registered by one Apple team. If signing reports that it is not available, pass your own:
+
+```sh
+RA_IOS_DEVELOPMENT_TEAM=TEAMID scripts/build_ios_debug.sh --device -- -DRA95_IOS_BUNDLE_ID=com.example.redalert
+```
+
 The debug iOS app intentionally includes your local ignored game data. On first launch it copies that bundled data into app-writable storage before starting the game, so saves and options can be written inside the iOS sandbox. Do not distribute that app bundle.
 
 ## Fullscreen
@@ -304,6 +310,20 @@ Toggle fullscreen while running:
 Command+Return on macOS
 Alt+Return on Linux
 ```
+
+## Touch Controls
+
+On Android and iOS:
+
+| Gesture | Action |
+| --- | --- |
+| Tap | Left click |
+| Drag | Left-button drag, e.g. a selection box |
+| Long press or quick two-finger tap | Right click, e.g. deselect units |
+| Two-finger drag | Scroll the map, or move the magnified view when zoomed in |
+| Pinch | Magnify the screen, up to 3x |
+| Quick three-finger tap | Show the whole screen again |
+| Tap during a movie | Skip the movie |
 
 ## Tests
 

@@ -124,7 +124,9 @@ assert_file_contains PORT/ANDROID/src/android_main.cpp "SDL_main"
 assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_main"
 assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_GetPrefPath"
 assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_GetBasePath"
-assert_file_contains PORT/IOS/src/ios_main.cpp "copy_directory_recursive"
+assert_file_contains PORT/IOS/src/ios_main.cpp "sync_directory_recursive"
+assert_file_contains PORT/IOS/src/ios_main.cpp 'symlink(source, &temporary[0])'
+assert_file_contains PORT/IOS/src/ios_main.cpp "copy_file(source_path.c_str(), dest_path.c_str())"
 assert_file_contains PORT/IOS/src/ios_main.cpp "redalert-root"
 assert_file_contains PORT/IOS/src/ios_app_delegate.m "RedAlertIOSDelegate"
 assert_file_contains PORT/IOS/src/ios_app_delegate.m "UIInterfaceOrientationMaskLandscape"
@@ -203,8 +205,11 @@ assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_emit_pan(event
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "RA_MOBILE_TOUCH"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobileTouchGesture"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobilePointerDragCandidate"
-assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_ACCELERATED"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_PRESENTVSYNC"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE)"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_ShowCursor(SDL_DISABLE)"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp 'SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software")'
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_idle_delay"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_Delay(1)"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_HINT_IOS_HIDE_HOME_INDICATOR"
@@ -228,6 +233,12 @@ assert_file_not_contains WIN32LIB/KEYBOARD/MOUSE.CPP "#if defined(__ANDROID__)"
 
 perl -0ne 'exit(/static void mac_queue_mouse_button_with_cursor\([^\)]*\)\s*\{\s*MacMousePoint\.x\s*=\s*x;\s*MacMousePoint\.y\s*=\s*y;[\s\S]*?if \(update_cursor\)/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
   || fail "Android tap button events must update the legacy cursor position even when the touch cursor stays hidden"
+
+perl -0ne 'exit(/static void mac_update_mouse_position\([^\)]*\)\s*\{(?:(?!mac_queue_message)[\s\S])*?\}/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
+  || fail "mouse motion must update cursor state without flooding the legacy message queue"
+
+perl -0ne 'exit(/void MacSDL_Present8\([^\)]*\)\s*\{[\s\S]*if \(MacPresenting\)[\s\S]*MacPresenting = true;[\s\S]*SDL_RenderPresent\(MacRenderer\);[\s\S]*MacPresenting = false;/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
+  || fail "nested primary-surface writes must not trigger nested presentations"
 
 perl -0ne 'exit(/Uint32 window_flags = SDL_WINDOW_SHOWN \| SDL_WINDOW_RESIZABLE;[\s\S]*#if defined\(RA_MOBILE_TOUCH\)[\s\S]*window_flags \|= SDL_WINDOW_BORDERLESS;[\s\S]*#endif/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
   || fail "mobile SDL windows must be borderless so iOS hides system chrome"
@@ -466,6 +477,10 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
 "$tmpdir/mobile_pan_test"
 
 "${cxx_cmd[@]}" "${inc_port[@]}" \
+  "$ROOT_DIR/tests/mobile_zoom_test.cpp" -o "$tmpdir/mobile_zoom_test"
+"$tmpdir/mobile_zoom_test"
+
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_key_message_test.cpp" -o "$tmpdir/mobile_key_message_test"
 "$tmpdir/mobile_key_message_test"
 
@@ -481,12 +496,18 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
   "$ROOT_DIR/tests/shape_extract_test.cpp" "$ROOT_DIR/WIN32LIB/SHAPE/GETSHAPE.CPP" -o "$tmpdir/shape_extract_test"
 "$tmpdir/shape_extract_test"
 
-"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
-  "$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" -o "$tmpdir/cps_uncompress_test"
+"${cxx_cmd[@]}" "$ROOT_DIR/tests/lcw_uncompress_test.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/lcw_uncompress_test"
+"$tmpdir/lcw_uncompress_test"
+
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_code[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
+	"$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/cps_uncompress_test"
 "$tmpdir/cps_uncompress_test"
 
 "${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/dos_compat_test.cpp" "$ROOT_DIR/PORT/MAC/src/dos_compat.cpp" -o "$tmpdir/dos_compat_test"
 "$tmpdir/dos_compat_test"
+
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/ios_asset_sync_test.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/ios_asset_sync_test"
+"$tmpdir/ios_asset_sync_test" "$tmpdir/ios-assets"
 
 "${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_audio[@]}" \
   "$ROOT_DIR/tests/audio_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_audio_stub.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/audio_shim_test"

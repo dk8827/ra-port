@@ -97,6 +97,7 @@ unsigned long __cdecl Write_Data(char const *name, void *ptr, unsigned long size
 void * __cdecl Load_Alloc_Data(char const *name, MemoryFlagType flags);
 unsigned long __cdecl Load_Uncompress(char const *file, BufferClass& uncomp_buff, BufferClass& dest_buff, void *reserved_data=NULL);
 unsigned long __cdecl Uncompress_Data(void const *src, void *dst);
+unsigned long __cdecl Uncompress_Data_Bounded(void const *src, unsigned long src_size, void *dst, unsigned long dst_size);
 void __cdecl Set_Uncomp_Buffer(int buffer_segment, int size_of_buffer);
 
 /*=========================================================================*/
