@@ -10,6 +10,75 @@
 
 extern "C" {
 
+int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_length, void *dest, unsigned long dest_length, unsigned long *written)
+{
+	unsigned char const *source_ptr = (unsigned char const *)source;
+	unsigned char *dest_ptr = (unsigned char *)dest;
+	unsigned long source_pos = 0;
+	unsigned long dest_pos = 0;
+
+	if (!source || !dest || !written) return 0;
+	*written = 0;
+
+	while (source_pos < source_length) {
+		unsigned char op_code = source_ptr[source_pos++];
+		unsigned long count;
+		unsigned long offset;
+
+		if (!(op_code & 0x80)) {
+			if (source_pos >= source_length) return 0;
+			count = (op_code >> 4) + 3;
+			offset = source_ptr[source_pos++] + (((unsigned long)op_code & 0x0f) << 8);
+			if (offset == 0 || offset > dest_pos || count > dest_length - dest_pos) return 0;
+			while (count--) {
+				dest_ptr[dest_pos] = dest_ptr[dest_pos - offset];
+				dest_pos++;
+			}
+			continue;
+		}
+
+		if (!(op_code & 0x40)) {
+			if (op_code == 0x80) {
+				*written = dest_pos;
+				return 1;
+			}
+			count = op_code & 0x3f;
+			if (count > source_length - source_pos || count > dest_length - dest_pos) return 0;
+			while (count--) dest_ptr[dest_pos++] = source_ptr[source_pos++];
+			continue;
+		}
+
+		if (op_code == 0xfe) {
+			if (source_length - source_pos < 3) return 0;
+			count = source_ptr[source_pos] + ((unsigned long)source_ptr[source_pos + 1] << 8);
+			unsigned char data = source_ptr[source_pos + 2];
+			source_pos += 3;
+			if (count > dest_length - dest_pos) return 0;
+			while (count--) dest_ptr[dest_pos++] = data;
+			continue;
+		}
+
+		if (op_code == 0xff) {
+			if (source_length - source_pos < 4) return 0;
+			count = source_ptr[source_pos] + ((unsigned long)source_ptr[source_pos + 1] << 8);
+			offset = source_ptr[source_pos + 2] + ((unsigned long)source_ptr[source_pos + 3] << 8);
+			source_pos += 4;
+		} else {
+			if (source_length - source_pos < 2) return 0;
+			count = (op_code & 0x3f) + 3;
+			offset = source_ptr[source_pos] + ((unsigned long)source_ptr[source_pos + 1] << 8);
+			source_pos += 2;
+		}
+		/* VQA deltas may copy from the previous frame, including bytes at
+		** or beyond the current write cursor. Bound both ranges, not their
+		** relative positions; the destination is initialized by the caller. */
+		if (offset > dest_length || count > dest_length - offset || count > dest_length - dest_pos) return 0;
+		while (count--) dest_ptr[dest_pos++] = dest_ptr[offset++];
+	}
+
+	return 0;
+}
+
 /***************************************************************************
  * LCW_UNCOMPRESS -- Decompress an LCW encoded data block.                 *
  *                                                                         *

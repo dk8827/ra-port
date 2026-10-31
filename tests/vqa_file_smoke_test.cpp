@@ -30,7 +30,7 @@ static int fail(char const *message)
 static long Callback(unsigned char *, long)
 {
 	FramesDrawn++;
-	return FramesDrawn >= 3;
+	return FramesDrawn >= 30;
 }
 
 static long FileHandler(VQAHandle *vqa, long action, void *buffer, long nbytes)
@@ -89,7 +89,7 @@ int main(void)
 	}
 
 	long rc = VQA_Play(handle, VQAMODE_RUN);
-	if (rc != VQAERR_EOF || FramesDrawn != 3) {
+	if (rc != VQAERR_EOF || FramesDrawn != 30) {
 		VQA_Close(handle);
 		VQA_Free(handle);
 		return fail("VQA_Play did not draw and stop through callback");
