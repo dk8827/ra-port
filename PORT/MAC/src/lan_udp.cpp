@@ -165,10 +165,19 @@ int UDPInterfaceClass::Read(void *buffer, int &buffer_len, void *address, int &a
 
 	for (;;) {
 		struct sockaddr_in source;
-		socklen_t source_len = sizeof(source);
-		int received = static_cast<int>(recvfrom(Socket, buffer, buffer_len, 0,
-			reinterpret_cast<struct sockaddr *>(&source), &source_len));
-		if (received <= 0) return 0;
+		struct iovec payload;
+		payload.iov_base = buffer;
+		payload.iov_len = buffer_len;
+		struct msghdr message;
+		memset(&message, 0, sizeof(message));
+		message.msg_name = &source;
+		message.msg_namelen = sizeof(source);
+		message.msg_iov = &payload;
+		message.msg_iovlen = 1;
+		int received = static_cast<int>(recvmsg(Socket, &message, 0));
+		if (received < 0) return 0;
+		// Never expose a partial datagram as a complete legacy packet.
+		if (!received || (message.msg_flags & MSG_TRUNC)) continue;
 
 		bool local = false;
 		for (int i = 0; i < LocalAddressCount; ++i) {

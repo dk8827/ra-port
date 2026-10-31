@@ -3,6 +3,7 @@
 #include "WSPUDP.h"
 
 #include <arpa/inet.h>
+#undef NDEBUG
 #include <assert.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -63,6 +64,14 @@ int main(void)
 	game_address.sin_family = AF_INET;
 	game_address.sin_port = htons(port);
 	assert(inet_aton("127.0.0.1", &game_address.sin_addr));
+
+	// An oversized datagram must be discarded, never returned as a prefix.
+	char oversized[128];
+	memset(oversized, 'x', sizeof(oversized));
+	assert(sendto(peer, oversized, sizeof(oversized), 0,
+		reinterpret_cast<struct sockaddr *>(&game_address), sizeof(game_address)) == sizeof(oversized));
+	assert(sendto(peer, oversized, 0, 0,
+		reinterpret_cast<struct sockaddr *>(&game_address), sizeof(game_address)) == 0);
 
 	char const incoming[] = "lan-in";
 	assert(sendto(peer, incoming, sizeof(incoming), 0,
