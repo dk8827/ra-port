@@ -129,6 +129,9 @@ build_project() {
     fi
     xcode_settings+=(DEVELOPMENT_TEAM="$RA_IOS_DEVELOPMENT_TEAM")
     xcode_settings+=(CODE_SIGNING_ALLOWED=YES)
+    # Let Xcode create the development provisioning profile when none exists
+    # yet, e.g. the first build for a free personal team.
+    xcode_settings+=(-allowProvisioningUpdates)
   fi
 
   cmake --build "$BUILD_DIR" --config "$CONFIGURATION" --target redalert_ios -- "${xcode_settings[@]}"
