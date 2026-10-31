@@ -79,7 +79,7 @@ class IPXGlobalConnClass : public IPXConnClass
 		virtual int Receive_Packet (void * buf, int buflen,
 			IPXAddressClass *address);
 		virtual int Get_Packet (void * buf, int *buflen,
-			IPXAddressClass *address, unsigned short *product_id);
+			IPXAddressClass *address, unsigned short *product_id, int capacity);
 
 		//.....................................................................
 		// This is for telling the connection it can cross a bridge.

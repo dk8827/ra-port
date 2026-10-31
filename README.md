@@ -35,7 +35,8 @@ This is an unofficial source port based on the source code Electronic Arts relea
 | :white_check_mark: | Skirmish | Local skirmish is fully working. |
 | :white_check_mark: | Videos | Videos are playing with sound. |
 | :white_check_mark: | Controls and audio | macOS keyboard/mouse plus Android and iOS touch/audio work. |
-| :x: | Online/network multiplayer | Not wired up yet. |
+| :white_check_mark: | LAN multiplayer | macOS and Linux players can host and join over local UDP. |
+| :x: | Internet multiplayer | Not wired up yet. |
 | :x: | Launcher/setup tools | Not ported. |
 | :x: | Expansion packs | Not a focus yet. |
 | :x: | `.app` bundle | Not packaged yet; the build creates a normal macOS executable. |
@@ -86,6 +87,8 @@ On Ubuntu, run:
 ```sh
 scripts/run_linux_dev.sh --no-build
 ```
+
+For LAN multiplayer, run the same build and game data on both computers, then choose **Multiplayer Game → Network**. One player selects **New** and the other selects the advertised game and **Join**. Both machines must be on the same subnet and allow UDP port `34835` through their firewalls.
 
 To build and run the Android debug APK, install the Android prerequisites listed below, keep the same prepared local game data under `assets/redalert`, then run:
 
@@ -337,6 +340,8 @@ Validate a fresh checkout with a full build first:
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build --target redalert_mac -j 8
+cmake --build build --target lan_udp_test -j 8
+./build/lan_udp_test
 tests/run_script_tests.sh
 ```
 
@@ -345,6 +350,8 @@ On Linux:
 ```sh
 cmake -S . -B build-linux -G Ninja
 cmake --build build-linux --target redalert_linux -j 8
+cmake --build build-linux --target lan_udp_test -j 8
+./build-linux/lan_udp_test
 tests/run_script_tests.sh
 ```
 
@@ -367,7 +374,7 @@ tests/run_script_tests.sh
 
 The port is intentionally conservative: keep original source layout and behavior recognizable, and prefer small platform-specific support files over broad rewrites. Good next areas are macOS `.app` packaging, Linux packaging, Android/iOS release packaging, physical device validation, Intel macOS validation, save/load hardening, expansion support, CI coverage, and mobile input/UI polish.
 
-Network and online multiplayer are out of scope for the current milestone.
+Internet multiplayer is out of scope for the current milestone.
 
 ## License And Notice
 

@@ -125,13 +125,6 @@ class WinsockInterfaceClass {
 		} WinsockBufferType;
 
 		/*
-		** Array of buffers to temporarily store incoming and outgoing packets.
-		*/
-		DynamicVectorClass <WinsockBufferType *> InBuffers;
-		DynamicVectorClass <WinsockBufferType *> OutBuffers;
-
-
-		/*
 		** Is Winsock present and initialised?
 		*/
 		bool 					WinsockInitialised;
@@ -140,6 +133,7 @@ class WinsockInterfaceClass {
 		** Socket that communications will take place over.
 		*/
 		SOCKET				Socket;
+		unsigned short		Port;
 
 		/*
 		** Async object required for callbacks to our message handler.

@@ -41,7 +41,9 @@ extern BOOL UseBigShapeBuffer;
 extern bool UseOldShapeDraw;
 void *Get_Shape_Header_Data(void *ptr);
 
+#ifndef RA95_NATIVE_SOCKETS
 char const *EngMisStr[] = { NULL };
+#endif
 char ModemRXString[80] = {0};
 WinModemClass *SerialPort = NULL;
 
@@ -1516,6 +1518,7 @@ char *Extract_String(void const *data, int string)
 	return ((char *)data) + offsets[string];
 }
 
+#ifndef RA95_NATIVE_SOCKETS
 unsigned long Compute_Name_CRC(char *name)
 {
 	if (!name) return 0;
@@ -1553,6 +1556,7 @@ bool Process_Global_Packet(GlobalPacketType *, IPXAddressClass *)
 void Net_Reconnect_Dialog(int, int, int, unsigned long)
 {
 }
+#endif
 
 bool bSpecialAftermathScenario(char const *)
 {

@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <mem.h>
 #include "ipxgconn.h"
+#ifdef RA95_NATIVE_SOCKETS
+#include "lanpacket.h"
+#endif
 
 
 /***************************************************************************
@@ -169,7 +172,14 @@ int IPXGlobalConnClass::Receive_Packet (void * buf, int buflen,
 	/*------------------------------------------------------------------------
 	Check the magic #
 	------------------------------------------------------------------------*/
+	if (!buf || buflen < (int)sizeof(GlobalHeaderType)) return 0;
 	packet = (GlobalHeaderType *)buf;
+#ifdef RA95_NATIVE_SOCKETS
+	if (packet->ProductID != ProductID) return 0;
+	if ((packet->Header.Code == PACKET_DATA_ACK || packet->Header.Code == PACKET_DATA_NOACK) &&
+		!Lan_Valid_Global_Payload((char *)buf + sizeof(GlobalHeaderType),
+			buflen - sizeof(GlobalHeaderType))) return 0;
+#endif
 	if (packet->Header.MagicNumber!=MagicNum) {
 		return(0);
 	}
@@ -298,6 +308,7 @@ int IPXGlobalConnClass::Receive_Packet (void * buf, int buflen,
  *		address		filled in with sender's address									*
  *		product_id	filled in with sender's ProductID								*
  *                                                                         *
+ *		capacity	maximum bytes writable at buf
  * OUTPUT:                                                                 *
  *		1 = OK, 0 = error																		*
  *                                                                         *
@@ -308,7 +319,7 @@ int IPXGlobalConnClass::Receive_Packet (void * buf, int buflen,
  *   12/20/1994 BR : Created.                                              *
  *=========================================================================*/
 int IPXGlobalConnClass::Get_Packet (void * buf, int *buflen,
-	IPXAddressClass *address, unsigned short *product_id)
+	IPXAddressClass *address, unsigned short *product_id, int capacity)
 {
 	ReceiveQueueType *rec_entry;					// ptr to receive entry header
 	GlobalHeaderType *packet;
@@ -341,6 +352,10 @@ int IPXGlobalConnClass::Get_Packet (void * buf, int *buflen,
 		.....................................................................*/
 		packet = (GlobalHeaderType *)(rec_entry->Buffer);
 		packetlen = rec_entry->BufLen - sizeof(GlobalHeaderType);
+		if (!buf || packetlen < 0 || packetlen > capacity) {
+			*buflen = 0;
+			return 0;
+		}
 		if (packetlen > 0) {
 			memcpy(buf, rec_entry->Buffer + sizeof(GlobalHeaderType), packetlen);
 		}

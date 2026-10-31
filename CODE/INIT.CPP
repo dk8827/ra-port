@@ -14,7 +14,6 @@
 #ifdef WINSOCK_IPX
 #include	"WSProto.h"
 #include	"WSPUDP.h"
-#include	"WSPIPX.h"
 #include	"internet.h"
 #else	//WINSOCK_IPX
 #include	"tcpip.h"
@@ -1204,7 +1203,7 @@ bool Select_Game(bool fade)
 #ifdef WINSOCK_IPX
 							if (PacketTransport ) delete PacketTransport;
 //							if (WWMessageBox().Process("Select a protocol to use for network play.", "UDP", "IPX")) {
-								PacketTransport = new IPXInterfaceClass;
+								PacketTransport = new UDPInterfaceClass;
 								assert ( PacketTransport != NULL);
 //							}else{
 //								PacketTransport = new UDPInterfaceClass;	//IPXInterfaceClass;

@@ -1638,7 +1638,7 @@ void IPX_Call_Back(void)
 	** messages from the connection dialogs.
 	*/
 	if (!Session.NetOpen) {
-		if (Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen, &Session.GAddress, &Session.GProductID)) {
+		if (Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen, &Session.GAddress, &Session.GProductID, sizeof(Session.GPacket))) {
 
 			if (Session.GProductID == IPXGlobalConnClass::COMMAND_AND_CONQUER0) {
 
