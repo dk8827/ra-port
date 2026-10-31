@@ -22,8 +22,6 @@ unsigned long Seek_File(int, long, int) { return 0; }
 unsigned long File_Size(int) { return 0; }
 void *Alloc(unsigned long, MemoryFlagType) { return 0; }
 void Free(void const *) {}
-extern "C" unsigned long LCW_Uncompress(void *, void *, unsigned long) { return 0; }
-
 int main(void)
 {
 	unsigned char source[32];
@@ -50,6 +48,24 @@ int main(void)
 	if (size != 3) return fail("uncompressed size should come from CPS byte offset 2");
 	if (dest[0] != 3 || dest[1] != 0x22 || dest[2] != 0x33) {
 		return fail("uncompressed bytes should start after the 8-byte CPS header");
+	}
+
+	memset(dest, 0, sizeof(dest));
+	if (Uncompress_Data_Bounded(source, 11, dest, sizeof(dest)) != 3) {
+		return fail("bounded CPS decode should accept valid input");
+	}
+	if (Uncompress_Data_Bounded(source, 10, dest, sizeof(dest)) != 0) {
+		return fail("bounded CPS decode should reject truncated input");
+	}
+	source[2] = 5;
+	if (Uncompress_Data_Bounded(source, 11, dest, sizeof(dest)) != 0) {
+		return fail("bounded CPS decode should reject oversized output");
+	}
+	source[2] = 1;
+	source[0] = LCW;
+	source[8] = 0x81;
+	if (Uncompress_Data_Bounded(source, 9, dest, sizeof(dest)) != 0) {
+		return fail("bounded CPS decode should reject truncated LCW data");
 	}
 
 	return 0;

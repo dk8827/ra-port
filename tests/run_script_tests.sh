@@ -481,8 +481,11 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
   "$ROOT_DIR/tests/shape_extract_test.cpp" "$ROOT_DIR/WIN32LIB/SHAPE/GETSHAPE.CPP" -o "$tmpdir/shape_extract_test"
 "$tmpdir/shape_extract_test"
 
-"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
-  "$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" -o "$tmpdir/cps_uncompress_test"
+"${cxx_cmd[@]}" "$ROOT_DIR/tests/lcw_uncompress_test.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/lcw_uncompress_test"
+"$tmpdir/lcw_uncompress_test"
+
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_code[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
+	"$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/cps_uncompress_test"
 "$tmpdir/cps_uncompress_test"
 
 "${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/dos_compat_test.cpp" "$ROOT_DIR/PORT/MAC/src/dos_compat.cpp" -o "$tmpdir/dos_compat_test"

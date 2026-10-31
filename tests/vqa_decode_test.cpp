@@ -3,7 +3,7 @@
 
 #include "windows.h"
 
-extern "C" void MacVQA_UnVQ4x2(unsigned char const *codebook, unsigned char const *pointers, unsigned char *buffer, unsigned long blocks_per_row, unsigned long rows, unsigned long buffer_width);
+extern "C" bool MacVQA_UnVQ4x2(unsigned char const *codebook, unsigned long codebook_size, unsigned char const *pointers, unsigned char *buffer, unsigned long blocks_per_row, unsigned long rows, unsigned long buffer_width);
 
 bool MacSDL_SetMode(int, int) { return true; }
 void MacSDL_Shutdown(void) {}
@@ -34,7 +34,7 @@ int main()
 
 	unsigned char frame[16];
 	memset(frame, 0, sizeof(frame));
-	MacVQA_UnVQ4x2(codebook, pointers, frame, 2, 1, 8);
+	assert(MacVQA_UnVQ4x2(codebook, sizeof(codebook), pointers, frame, 2, 1, 8));
 
 	assert(frame[0] == 0x20);
 	assert(frame[1] == 0x21);
@@ -52,6 +52,11 @@ int main()
 	assert(frame[13] == 0x55);
 	assert(frame[14] == 0x55);
 	assert(frame[15] == 0x55);
+
+	unsigned char invalid_pointers[2] = {2, 0};
+	memset(frame, 0, sizeof(frame));
+	assert(!MacVQA_UnVQ4x2(codebook, sizeof(codebook), invalid_pointers, frame, 1, 1, 4));
+	assert(frame[0] == 0 && frame[4] == 0);
 
 	return 0;
 }
