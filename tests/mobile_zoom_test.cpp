@@ -229,8 +229,26 @@ static void test_new_pair_uses_current_scale(void)
 	assert(approx(scale, 1.0f));
 }
 
+static void test_two_finger_double_tap(void)
+{
+	MobilePinchState pinch;
+	MobilePinch_Init(&pinch);
+	assert(!MobilePinch_RecordTap(&pinch, 1000, 2));
+	assert(MobilePinch_RecordTap(&pinch, 1450, 2));
+	assert(!MobilePinch_RecordTap(&pinch, 1500, 2));
+	assert(!MobilePinch_RecordTap(&pinch, 1951, 2));
+	assert(!MobilePinch_RecordTap(&pinch, 2000, 3));
+	assert(!MobilePinch_RecordTap(&pinch, 2050, 2));
+	assert(!MobilePinch_RecordTap(&pinch, 2100, 0));
+	assert(!MobilePinch_RecordTap(&pinch, 2150, 2));
+	MobilePinch_Init(&pinch);
+	assert(!MobilePinch_RecordTap(&pinch, 0xffffff00UL, 2));
+	assert(MobilePinch_RecordTap(&pinch, 50, 2));
+}
+
 int main(void)
 {
+	test_two_finger_double_tap();
 	test_parallel_drag_preserves_scale_at_both_limits();
 	test_new_pair_uses_current_scale();
 	test_quick_still_two_finger_tap_is_recognised();

@@ -9,7 +9,7 @@
  */
 
 #include	"lzostraw.h"
-#include	"lzo.h"
+#include	"lzo1x.h"
 #include	<string.h>
 #include	<assert.h>
 
@@ -140,7 +140,7 @@ int LZOStraw::Get(void * destbuf, int slen)
 		} else {
 			BlockHeader.UncompCount = (unsigned short)Straw::Get(Buffer, BlockSize);
 			if (BlockHeader.UncompCount == 0) break;
-			char *dictionary = new char [64*1024];
+			char *dictionary = new char [LZO1X_MEM_COMPRESS];
 			unsigned int length = sizeof (Buffer2) - sizeof (BlockHeader);
 			lzo1x_1_compress ((unsigned char*)Buffer, BlockHeader.UncompCount, (unsigned char*)(&Buffer2[sizeof(BlockHeader)]), &length, dictionary);
 			BlockHeader.CompCount = (unsigned short)length;

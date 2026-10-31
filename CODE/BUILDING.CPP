@@ -1165,12 +1165,29 @@ ResultType BuildingClass::Take_Damage(int & damage, int distance, WarheadType wa
 					*/
 					new SmudgeClass(Random_Pick(SMUDGE_CRATER1, SMUDGE_CRATER6), Cell_Coord(cell));
 					if (Percent_Chance(50)) {
-						new AnimClass(ANIM_FIRE_SMALL, Coord_Scatter(Cell_Coord(cell), 0x0080), Random_Pick(0, 7), Random_Pick(1, 3));
+						{
+							// Shared simulation RNG: scatter, then delay, then loop count.
+							COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0080);
+							int const delay = Random_Pick(0, 7);
+							int const loops = Random_Pick(1, 3);
+							new AnimClass(ANIM_FIRE_SMALL, scatter, delay, loops);
+						}
 						if (Percent_Chance(50)) {
-							new AnimClass(ANIM_FIRE_MED, Coord_Scatter(Cell_Coord(cell), 0x0040), Random_Pick(0, 7), Random_Pick(1, 3));
+							{
+								// Shared simulation RNG: scatter, then delay, then loop count.
+								COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0040);
+								int const delay = Random_Pick(0, 7);
+								int const loops = Random_Pick(1, 3);
+								new AnimClass(ANIM_FIRE_MED, scatter, delay, loops);
+							}
 						}
 					}
-					new AnimClass(ANIM_FBALL1, Coord_Scatter(Cell_Coord(cell), 0x0040), Random_Pick(0, 3));
+					{
+						// Shared simulation RNG: scatter, then delay, then loop count.
+						COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0040);
+						int const delay = Random_Pick(0, 3);
+						new AnimClass(ANIM_FBALL1, scatter, delay);
+					}
 				}
 
 				shakes = Class->Cost_Of() / 400;
@@ -1299,13 +1316,23 @@ ResultType BuildingClass::Take_Damage(int & damage, int distance, WarheadType wa
 							case 3:
 							case 4:
 							case 5:
-								anim = new AnimClass(ANIM_ON_FIRE_SMALL, Coord_Scatter(Cell_Coord(cell), 0x0060), 0, Random_Pick(1, 3));
+								{
+									// Shared simulation RNG: scatter, then delay, then loop count.
+									COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0060);
+									int const loops = Random_Pick(1, 3);
+									anim = new AnimClass(ANIM_ON_FIRE_SMALL, scatter, 0, loops);
+								}
 								break;
 
 							case 6:
 							case 7:
 							case 8:
-								anim = new AnimClass(ANIM_ON_FIRE_MED, Coord_Scatter(Cell_Coord(cell), 0x0060), 0, Random_Pick(1, 3));
+								{
+									// Shared simulation RNG: scatter, then delay, then loop count.
+									COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0060);
+									int const loops = Random_Pick(1, 3);
+									anim = new AnimClass(ANIM_ON_FIRE_MED, scatter, 0, loops);
+								}
 								break;
 
 							case 9:
@@ -1322,7 +1349,13 @@ ResultType BuildingClass::Take_Damage(int & damage, int distance, WarheadType wa
 							** renovator that caused the damage.
 							*/
 							if (source == NULL || source->What_Am_I() != RTTI_INFANTRY || *(InfantryClass *)source != INFANTRY_RENOVATOR) {
-								anim = new AnimClass(ANIM_FIRE_SMALL, Coord_Scatter(Cell_Coord(cell), 0x0060), Random_Pick(0, 7), Random_Pick(1, 3));
+								{
+									// Shared simulation RNG: scatter, then delay, then loop count.
+									COORDINATE const scatter = Coord_Scatter(Cell_Coord(cell), 0x0060);
+									int const delay = Random_Pick(0, 7);
+									int const loops = Random_Pick(1, 3);
+									anim = new AnimClass(ANIM_FIRE_SMALL, scatter, delay, loops);
+								}
 							}
 						}
 					}
@@ -1632,7 +1665,13 @@ void BuildingClass::Drop_Debris(TARGET source)
 				case 0:
 				case 1:
 				case 2:
-					new AnimClass(ANIM_SMOKE_M, Coord_Scatter(Cell_Coord(newcell), 0x0050, false), Random_Pick(0, 5), Random_Pick(1, 2));
+					{
+						// Shared simulation RNG: scatter, then delay, then loop count.
+						COORDINATE const scatter = Coord_Scatter(Cell_Coord(newcell), 0x0050, false);
+						int const delay = Random_Pick(0, 5);
+						int const loops = Random_Pick(1, 2);
+						new AnimClass(ANIM_SMOKE_M, scatter, delay, loops);
+					}
 					break;
 
 				default:
@@ -1645,7 +1684,9 @@ void BuildingClass::Drop_Debris(TARGET source)
 			if (Percent_Chance(25)) {
 				new SmudgeClass(Random_Pick(SMUDGE_SCORCH1, SMUDGE_SCORCH6), Cell_Coord(newcell));
 			} else {
-				new SmudgeClass(Random_Pick(SMUDGE_CRATER1, SMUDGE_CRATER6), Coord_Scatter(Cell_Coord(newcell), 0x0080, false));
+				// Choose crater type before scatter consumes the shared RNG.
+				SmudgeType const smudge = Random_Pick(SMUDGE_CRATER1, SMUDGE_CRATER6);
+				new SmudgeClass(smudge, Coord_Scatter(Cell_Coord(newcell), 0x0080, false));
 			}
 		}
 	}

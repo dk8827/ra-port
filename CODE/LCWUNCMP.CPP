@@ -8,6 +8,8 @@
  * See LICENSE.md.
  */
 
+#include <string.h>
+
 extern "C" {
 
 int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_length, void *dest, unsigned long dest_length, unsigned long *written)
@@ -105,24 +107,22 @@ int __cdecl LCW_Uncompress_Bounded(void const *source, unsigned long source_leng
  *     unsigned long # of destination bytes written                        *
  *                                                                         *
  * WARNINGS:                                                               *
- *     3rd argument is dummy. It exists to provide cross-platform          *
- *      compatibility. Note therefore that this implementation does not    *
- *      check for corrupt source data by testing the uncompressed length.  *
+ *     The caller must supply a valid compressed stream. Output stops at   *
+ *     the destination capacity, including for in-place decoding.          *
  *                                                                         *
  * HISTORY:                                                                *
  *    03/20/1995 IML : Created.                                            *
  *=========================================================================*/
-unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long )
-//unsigned long LCW_Uncompress (void * source, void * dest, unsigned long length)
+unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long length)
 {
 	unsigned char * source_ptr, * dest_ptr, * copy_ptr, op_code, data;
-	unsigned	  count, * word_dest_ptr, word_data;
+	unsigned count;
 
 	/* Copy the source and destination ptrs. */
 	source_ptr = (unsigned char*) source;
 	dest_ptr   = (unsigned char*) dest;
 
-	while (1 /*TRUE*/) {
+	while ((unsigned long)(dest_ptr - (unsigned char*)dest) < length) {
 
 		/* Read in the operation code. */
 		op_code = *source_ptr++;
@@ -133,7 +133,7 @@ unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long 
 			count	 = (op_code >> 4) + 3;
 			copy_ptr = dest_ptr - ((unsigned) *source_ptr++ + (((unsigned) op_code & 0x0f) << 8));
 
-			while (count--) *dest_ptr++ = *copy_ptr++;
+			while (count-- && (unsigned long)(dest_ptr - (unsigned char*)dest) < length) *dest_ptr++ = *copy_ptr++;
 
 		} else {
 
@@ -149,7 +149,7 @@ unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long 
 					/* Do a medium copy from source. */
 					count = op_code & 0x3f;
 
-					while (count--) *dest_ptr++ = *source_ptr++;
+					while (count-- && (unsigned long)(dest_ptr - (unsigned char*)dest) < length) *dest_ptr++ = *source_ptr++;
 				}
 
 			} else {
@@ -158,26 +158,15 @@ unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long 
 
 					/* Do a long run. */
 					count = *source_ptr + ((unsigned) *(source_ptr + 1) << 8);
-					word_data = data = *(source_ptr + 2);
-					word_data  = (word_data << 24) + (word_data << 16) + (word_data << 8) + word_data;
+					data = *(source_ptr + 2);
 					source_ptr += 3;
 
-					copy_ptr = dest_ptr + 4 - ((unsigned long) dest_ptr & 0x3);
-					count -= (copy_ptr - dest_ptr);
-					while (dest_ptr < copy_ptr) *dest_ptr++ = data;
-
-					word_dest_ptr = (unsigned*) dest_ptr;
-
-					dest_ptr += (count & 0xfffffffc);
-
-					while (word_dest_ptr < (unsigned*) dest_ptr) {
-						*word_dest_ptr		= word_data;
-						*(word_dest_ptr + 1) = word_data;
-						word_dest_ptr += 2;
-					}
-
-					copy_ptr = dest_ptr + (count & 0x3);
-					while (dest_ptr < copy_ptr) *dest_ptr++ = data;
+					/* Exact byte count also permits short and unaligned runs. The old
+					** paired-word loop could overwrite the next in-place opcode. */
+					unsigned long remaining = length - (unsigned long)(dest_ptr - (unsigned char*)dest);
+					if (count > remaining) count = remaining;
+					memset(dest_ptr, data, count);
+					dest_ptr += count;
 
 				} else {
 
@@ -188,7 +177,7 @@ unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long 
 						copy_ptr = (unsigned char*) dest + *(source_ptr + 2) + ((unsigned) *(source_ptr + 3) << 8);
 						source_ptr += 4;
 
-						while (count--) *dest_ptr++ = *copy_ptr++;
+						while (count-- && (unsigned long)(dest_ptr - (unsigned char*)dest) < length) *dest_ptr++ = *copy_ptr++;
 
 					} else {
 
@@ -197,12 +186,13 @@ unsigned long __cdecl LCW_Uncompress (void * source, void * dest, unsigned long 
 						copy_ptr = (unsigned char*) dest + *source_ptr + ((unsigned) *(source_ptr + 1) << 8);
 						source_ptr += 2;
 
-						while (count--) *dest_ptr++ = *copy_ptr++;
+						while (count-- && (unsigned long)(dest_ptr - (unsigned char*)dest) < length) *dest_ptr++ = *copy_ptr++;
 					}
 				}
 			}
 		}
 	}
+	return (unsigned long)(dest_ptr - (unsigned char*)dest);
 }
 
 }
