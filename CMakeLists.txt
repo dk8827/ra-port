@@ -70,3 +70,9 @@ add_executable(lan_packet_test tests/lan_packet_test.cpp)
 ra95_configure_target(lan_packet_test)
 target_compile_options(lan_packet_test PRIVATE "-iquote${RA95_CASEFOLD_INCLUDE_ROOT}/code")
 target_compile_definitions(lan_packet_test PRIVATE RA95_NATIVE_SOCKETS WINSOCK_IPX)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # GCC emits unused legacy file-class vtables through function.h; the
+    # packet-only test must not require the rest of the engine to link them.
+    target_compile_options(lan_packet_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(lan_packet_test PRIVATE -Wl,--gc-sections)
+endif()
