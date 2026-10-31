@@ -285,6 +285,12 @@ Build a signed device app for iPhone or iPad:
 RA_IOS_DEVELOPMENT_TEAM=TEAMID scripts/build_ios_debug.sh --device
 ```
 
+The default bundle identifier, `com.raport.redalert`, can only be registered by one Apple team. If signing reports that it is not available, pass your own:
+
+```sh
+RA_IOS_DEVELOPMENT_TEAM=TEAMID scripts/build_ios_debug.sh --device -- -DRA95_IOS_BUNDLE_ID=com.example.redalert
+```
+
 The debug iOS app intentionally includes your local ignored game data. On first launch it copies that bundled data into app-writable storage before starting the game, so saves and options can be written inside the iOS sandbox. Do not distribute that app bundle.
 
 ## Fullscreen
