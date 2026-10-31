@@ -1332,7 +1332,15 @@ static inline BOOL SetThreadPriority(HANDLE, int) { return TRUE; }
 
 static inline void InitializeCriticalSection(LPCRITICAL_SECTION section)
 {
-	if (!section || section->initialized) return;
+	/*
+	**	Do NOT trust section->initialized here. A CRITICAL_SECTION embedded in a
+	**	heap-allocated object (e.g. WWMouseClass) starts as uninitialised memory,
+	**	so the flag is whatever the allocator left behind. If it happens to be
+	**	non-zero the mutex is never pthread_mutex_init'd, and the first
+	**	EnterCriticalSection() blocks forever. Callers invoke this explicitly
+	**	from their constructors, so always perform the init.
+	*/
+	if (!section) return;
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);

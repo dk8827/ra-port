@@ -2814,6 +2814,15 @@ static void Init_Fonts(void)
  *=============================================================================================*/
 static void Init_CDROM_Access(void)
 {
+#if defined(__ANDROID__)
+	/*
+	**	Android has no optical drive. Game data lives in local storage, so the
+	**	CD handshake below -- Force_CD_Available(-1) followed by
+	**	CCFileClass::Set_Search_Drives("?:\\") -- scans for drive letters that
+	**	can never appear and startup never completes. Skip it entirely.
+	*/
+	return;
+#endif
 	VisiblePage.Clear();
 	HidPage.Clear();
 
