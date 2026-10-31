@@ -28,9 +28,10 @@ jobs:
         run: cmake -S . -B build-linux -G Ninja
 
       - name: Build
-        run: cmake --build build-linux --target redalert_linux lan_udp_test -j 3
+        run: cmake --build build-linux --target redalert_linux lan_udp_test lan_packet_test -j 3
 
       - name: Test
         run: |
           ./build-linux/lan_udp_test
+          ./build-linux/lan_packet_test
           tests/run_script_tests.sh

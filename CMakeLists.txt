@@ -65,3 +65,8 @@ add_executable(lan_udp_test
 )
 ra95_configure_target(lan_udp_test)
 target_compile_definitions(lan_udp_test PRIVATE RA95_NATIVE_SOCKETS WINSOCK_IPX)
+
+add_executable(lan_packet_test tests/lan_packet_test.cpp)
+ra95_configure_target(lan_packet_test)
+target_compile_options(lan_packet_test PRIVATE "-iquote${RA95_CASEFOLD_INCLUDE_ROOT}/code")
+target_compile_definitions(lan_packet_test PRIVATE RA95_NATIVE_SOCKETS WINSOCK_IPX)

@@ -3386,7 +3386,7 @@ static JoinEventType Get_Join_Responses(JoinStateType *joinstate, ListClass *gam
 	//	If there is no incoming packet, just return
 	//------------------------------------------------------------------------
 	rc = Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen,
-		&Session.GAddress, &Session.GProductID);
+		&Session.GAddress, &Session.GProductID, sizeof(Session.GPacket));
 	if (!rc || Session.GProductID != IPXGlobalConnClass::COMMAND_AND_CONQUER0)
 		return(EV_NONE);
 
@@ -3747,11 +3747,7 @@ static JoinEventType Get_Join_Responses(JoinStateType *joinstate, ListClass *gam
 			...............................................................*/
 			strcpy (Session.Options.ScenarioDescription, Session.GPacket.ScenarioInfo.Scenario);
 			strcpy (Session.ScenarioFileName, Session.GPacket.ScenarioInfo.ShortFileName);
-#ifdef WOLAPI_INTEGRATION
-			strncpy (Session.ScenarioDigest, (char*)Session.GPacket.ScenarioInfo.FileDigest, sizeof (Session.GPacket.ScenarioInfo.FileDigest));
-#else
-			strcpy (Session.ScenarioDigest, (char*)Session.GPacket.ScenarioInfo.FileDigest);
-#endif
+			memcpy(Session.ScenarioDigest, Session.GPacket.ScenarioInfo.FileDigest, sizeof(Session.ScenarioDigest));
 			Session.ScenarioIsOfficial = Session.GPacket.ScenarioInfo.OfficialScenario;
 			Session.ScenarioFileLength = Session.GPacket.ScenarioInfo.FileLength;
 
@@ -5092,7 +5088,7 @@ static int Net_New_Dialog(void)
 		do	{
 			Ipx.Service();
 			int retcode = Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen,
-				&Session.GAddress, &Session.GProductID);
+				&Session.GAddress, &Session.GProductID, sizeof(Session.GPacket));
 			if (retcode && Session.GProductID == IPXGlobalConnClass::COMMAND_AND_CONQUER0) {
 
 				for ( i=1 ; i<Session.Players.Count() ; i++ ) {
@@ -5234,7 +5230,7 @@ static JoinEventType Get_NewGame_Responses(ColorListClass *playerlist,
 	//	If there is no incoming packet, just return
 	//------------------------------------------------------------------------
 	rc = Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen,
-		&Session.GAddress, &Session.GProductID);
+		&Session.GAddress, &Session.GProductID, sizeof(Session.GPacket));
 	if (!rc || Session.GProductID != IPXGlobalConnClass::COMMAND_AND_CONQUER0) {
 		return(EV_NONE);
 	}
@@ -6729,7 +6725,7 @@ static int Net_Fake_New_Dialog(void)
 		do	{
 			Ipx.Service();
 			int retcode = Ipx.Get_Global_Message (&Session.GPacket, &Session.GPacketlen,
-				&Session.GAddress, &Session.GProductID);
+				&Session.GAddress, &Session.GProductID, sizeof(Session.GPacket));
 			if (retcode && Session.GProductID == IPXGlobalConnClass::COMMAND_AND_CONQUER0) {
 
 				for ( i=1 ; i<Session.Players.Count() ; i++ ) {

@@ -19,7 +19,10 @@ jobs:
         run: cmake -S . -B build -G Ninja
 
       - name: Build
-        run: cmake --build build --target redalert_mac -j 3
+        run: cmake --build build --target redalert_mac lan_udp_test lan_packet_test -j 3
 
       - name: Test
-        run: tests/run_script_tests.sh
+        run: |
+          ./build/lan_udp_test
+          ./build/lan_packet_test
+          tests/run_script_tests.sh

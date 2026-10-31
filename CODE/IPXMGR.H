@@ -87,7 +87,7 @@ class IPXManagerClass : public ConnManClass
 		int Send_Global_Message (void *buf, int buflen, int ack_req = 0,
 			IPXAddressClass *address = NULL);
 		int Get_Global_Message (void *buf, int *buflen, IPXAddressClass *address,
-			unsigned short *product_id);
+			unsigned short *product_id, int capacity);
 
 		virtual int Send_Private_Message (void *buf, int buflen,
 			int ack_req = 1, int conn_id = CONNECTION_NONE);

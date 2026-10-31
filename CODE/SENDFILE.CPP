@@ -111,7 +111,7 @@ bool Get_Scenario_File_From_Host(char *return_name, int gametype)
 			Ipx.Service();
 			int receive_packet_length = sizeof (net_receive_packet);
 			if (Ipx.Get_Global_Message (&net_receive_packet, &receive_packet_length,
-				&sender_address, &product_id)){
+				&sender_address, &product_id, sizeof(net_receive_packet))){
 
 //WWDebugString ("RA95 - Got packet from host\n");
 #ifdef WINSOCK_IPX
@@ -179,6 +179,7 @@ bool Get_Scenario_File_From_Host(char *return_name, int gametype)
  *=============================================================================================*/
 bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gametype)
 {
+	if (!file_length) return false;
 
 	//WWDebugString ("RA95 - In Receive_Remote_File\n");
 	unsigned short		product_id;
@@ -370,7 +371,10 @@ bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gamety
 
 				if (receive_packet.Command == NET_FILE_CHUNK){
 
-					if (receive_packet.BlockNumber == last_received_block + 1){
+					if (receive_packet.BlockNumber == last_received_block + 1 &&
+						receive_packet.BlockLength > 0 &&
+						receive_packet.BlockLength <= sizeof(receive_packet.RawData) &&
+						receive_packet.BlockLength <= file_length - total_length){
 
 						save_file.Write ( receive_packet.RawData, receive_packet.BlockLength );
 						total_length += receive_packet.BlockLength;
@@ -378,7 +382,7 @@ bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gamety
 
 						update_time++;
 						if (update_time >7){
-							progress_meter.Set_Value ( (total_length*100) / file_length );
+							progress_meter.Set_Value ( (unsigned int)(((unsigned long long)total_length * 100) / file_length) );
 							display = REDRAW_PROGRESS;
 							update_time = 0;;
 						}
@@ -397,7 +401,7 @@ bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gamety
 
 			int receive_packet_len = sizeof (receive_packet);
 			if (Ipx.Get_Global_Message (&receive_packet, &receive_packet_len,
-				&sender_address, &product_id)){
+				&sender_address, &product_id, sizeof(receive_packet))){
 
 #ifdef WINSOCK_IPX
 				if (receive_packet.Command == NET_FILE_CHUNK && sender_address == Session.HostAddress){
@@ -406,7 +410,10 @@ bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gamety
 							(Winsock.Get_Connected() || sender_address == Session.HostAddress)){
 #endif	//WINSOCK_IPX
 
-					if (receive_packet.BlockNumber == last_received_block + 1){
+					if (receive_packet.BlockNumber == last_received_block + 1 &&
+						receive_packet.BlockLength > 0 &&
+						receive_packet.BlockLength <= sizeof(receive_packet.RawData) &&
+						receive_packet.BlockLength <= file_length - total_length){
 
 						save_file.Write ( receive_packet.RawData, receive_packet.BlockLength );
 						total_length += receive_packet.BlockLength;
@@ -414,7 +421,7 @@ bool Receive_Remote_File ( char *file_name, unsigned int file_length, int gamety
 
 						update_time++;
 						if (update_time >7){
-							progress_meter.Set_Value ( (total_length*100) / file_length );
+							progress_meter.Set_Value ( (unsigned int)(((unsigned long long)total_length * 100) / file_length) );
 							display = REDRAW_PROGRESS;
 							update_time = 0;;
 						}

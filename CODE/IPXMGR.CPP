@@ -724,6 +724,7 @@ int IPXManagerClass::Send_Global_Message(void *buf, int buflen,
  *		address			IPX address of sender											*
  *		product_id		product ID of sender												*
  *                                                                         *
+ *		capacity	maximum bytes writable at buf
  * OUTPUT:                                                                 *
  *		1 = OK, 0 = error																		*
  *                                                                         *
@@ -734,14 +735,14 @@ int IPXManagerClass::Send_Global_Message(void *buf, int buflen,
  *   01/25/1995 BR : Created.                                              *
  *=========================================================================*/
 int IPXManagerClass::Get_Global_Message(void *buf, int *buflen,
-	IPXAddressClass *address, unsigned short *product_id)
+	IPXAddressClass *address, unsigned short *product_id, int capacity)
 {
 	//------------------------------------------------------------------------
 	//	Error if IPX not installed or not Listening
 	//------------------------------------------------------------------------
 	if (!IPXStatus || !Listening) return(0);
 
-	return(GlobalChannel->Get_Packet (buf, buflen, address, product_id));
+	return(GlobalChannel->Get_Packet (buf, buflen, address, product_id, capacity));
 
 }	/* end of Get_Global_Message */
 
