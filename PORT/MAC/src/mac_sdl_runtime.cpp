@@ -754,9 +754,10 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = 0;
 				int y = 0;
 				if (MobilePinch_BothActive(&MobilePinch)) {
-					int tap_fingers = MobilePinch_EndTapFingers(&MobilePinch, mac_now_ms());
-					if (tap_fingers == 3) {
-						/* A quick three-finger tap shows the whole frame again. */
+					unsigned long now = mac_now_ms();
+					int tap_fingers = MobilePinch_EndTapFingers(&MobilePinch, now);
+					if (MobilePinch_RecordTap(&MobilePinch, now, tap_fingers)) {
+						/* A two-finger double tap shows the whole frame again. */
 						MobileZoom_Init(&MobileZoom);
 					} else if (tap_fingers == 2 && MobileTouch.primary_active) {
 						/* A quick two-finger tap is a right click, which deselects units. */
@@ -769,6 +770,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 						MobileZoom_SnapIfNearlyUnzoomed(&MobileZoom);
 					}
 				}
+				if (MobilePinch.max_down == 1) MobilePinch.had_tap = 0;
 				MobilePinch_Up(&MobilePinch, (long long)event.tfinger.fingerId);
 				mobile_logical_point(event.tfinger.x, event.tfinger.y, &x, &y);
 				if (InMovie && MobileTouchGesture_IsTapEnd(&MobileTouch, (long long)event.tfinger.fingerId, x, y)) {

@@ -199,6 +199,8 @@ Runtime files such as `SAVEGAME.*`, `OPTIONS.INI`, `ASSERT.TXT`, screenshots, lo
 
 ## Android Debug APK
 
+Android CI builds an arm64 debug APK with only a placeholder INI file. The `ra-port-android-build-check` artifact verifies compilation and packaging; playing requires a local build with your own game data.
+
 The Android target is for local development and testing only. It builds an arm64-v8a debug APK, locks the activity to landscape, uses touch-native input, and extracts the bundled debug assets into app storage on first launch.
 
 Install Android tooling:
@@ -322,7 +324,7 @@ On Android and iOS:
 | Long press or quick two-finger tap | Right click, e.g. deselect units |
 | Two-finger drag | Scroll the map, or move the magnified view when zoomed in |
 | Pinch | Magnify the screen, up to 3x |
-| Quick three-finger tap | Show the whole screen again |
+| Quick two-finger double tap | Show the whole screen again |
 | Tap during a movie | Skip the movie |
 
 ## Tests

@@ -955,7 +955,7 @@ int INIClass::Get_String(char const * section, char const * entry, char const * 
 		buffer[0] = '\0';
 		return(0);
 	} else {
-		strncpy(buffer, defvalue, size);
+		if (buffer != defvalue) strncpy(buffer, defvalue, size);
 		buffer[size-1] = '\0';
 		strtrim(buffer);
 		return(strlen(buffer));

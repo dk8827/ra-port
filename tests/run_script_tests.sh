@@ -481,6 +481,11 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
 "$tmpdir/mobile_zoom_test"
 
 "${cxx_cmd[@]}" "${inc_port[@]}" \
+  "$ROOT_DIR/tests/mobile_zoom_input_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_timer.cpp" \
+  $(pkg-config --cflags --libs sdl2) -o "$tmpdir/mobile_zoom_input_test"
+"$tmpdir/mobile_zoom_input_test"
+
+"${cxx_cmd[@]}" "${inc_port[@]}" \
   "$ROOT_DIR/tests/mobile_key_message_test.cpp" -o "$tmpdir/mobile_key_message_test"
 "$tmpdir/mobile_key_message_test"
 
@@ -498,6 +503,19 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
 
 "${cxx_cmd[@]}" "$ROOT_DIR/tests/lcw_uncompress_test.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/lcw_uncompress_test"
 "$tmpdir/lcw_uncompress_test"
+
+"${cxx_cmd[@]}" "$ROOT_DIR/tests/lcw_run_test.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/lcw_run_test"
+"$tmpdir/lcw_run_test"
+
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_code[@]}" "${inc_port[@]}" \
+  "$ROOT_DIR/tests/save_compression_test.cpp" "$ROOT_DIR/CODE/LZOPIPE.CPP" "$ROOT_DIR/CODE/LZOSTRAW.CPP" \
+  "$ROOT_DIR/CODE/PIPE.CPP" "$ROOT_DIR/CODE/STRAW.CPP" "$ROOT_DIR/CODE/LZO1X_C.CPP" "$ROOT_DIR/CODE/LZO1X_D.CPP" \
+  -o "$tmpdir/save_compression_test"
+"$tmpdir/save_compression_test"
+
+"${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_wsa[@]}" \
+  "$ROOT_DIR/tests/wsa_decode_test.cpp" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/wsa_decode_test"
+"$tmpdir/wsa_decode_test"
 
 "${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_code[@]}" "${inc_win_include[@]}" "${inc_win_iff[@]}" \
 	"$ROOT_DIR/tests/cps_uncompress_test.cpp" "$ROOT_DIR/WIN32LIB/IFF/LOAD.CPP" "$ROOT_DIR/CODE/LCWUNCMP.CPP" -o "$tmpdir/cps_uncompress_test"

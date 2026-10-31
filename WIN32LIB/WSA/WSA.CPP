@@ -137,7 +137,13 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 
 	anim_flags	= 0;
 	fh				= Open_File(file_name, READ);
-	Read_File(fh, (char *) &file_header, sizeof(WSA_FileHeaderType));
+	if (fh == WW_ERROR) {
+		return(NULL);
+	}
+	if (Read_File(fh, (char *) &file_header, sizeof(WSA_FileHeaderType)) != sizeof(WSA_FileHeaderType)) {
+		Close_File(fh);
+		return(NULL);
+	}
 
 	/*======================================================================*/
 	/* If the file has an attached palette then if we have a valid palette	*/
@@ -168,12 +174,24 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 	// Get the total file size minus the size of the first frame and the size
 	// of the file header.  These will not be read in to save even more space.
 	file_buffer_size = Seek_File(fh, 0L, SEEK_END);
+	offsets_size = (file_header.total_frames + 2) * WSA_FILE_OFFSET_SIZE;
+	if (!file_header.total_frames || !file_header.pixel_width || !file_header.pixel_height ||
+		!file_header.largest_frame_size ||
+		file_buffer_size < (long)(WSA_FILE_HEADER_SIZE + offsets_size + palette_adjust) ||
+		(file_header.frame0_offset &&
+		 (file_header.frame0_offset < WSA_FILE_HEADER_SIZE + offsets_size ||
+		  file_header.frame0_end < file_header.frame0_offset ||
+		  file_header.frame0_end > (unsigned long)(file_buffer_size - palette_adjust) ||
+		  file_header.frame0_end - file_header.frame0_offset > file_header.largest_frame_size))) {
+		Close_File(fh);
+		return NULL;
+	}
 
 	if (file_header.frame0_offset) {
 		long tlong;
 
 		tlong = file_header.frame0_end - file_header.frame0_offset;
-		frame0_size = (unsigned short) tlong;
+		frame0_size = (unsigned int) tlong;
 	}
 	else {
 		anim_flags |= WSA_FRAME_0_ON_PAGE;
@@ -255,6 +273,10 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 
 		// allocate buffer needed
 		user_buffer = (char *) Alloc(user_buffer_size, MEM_CLEAR);
+		if (user_buffer == NULL) {
+			Close_File(fh);
+			return(NULL);
+		}
 
 		anim_flags |= WSA_SYS_ALLOCATED;
 	}
@@ -277,7 +299,7 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 
 	//	Clear target buffer if it is in the user buffer.
 	if (target_buffer_size) {
-		memset( target_buffer, 0, (unsigned short) target_buffer_size );
+		memset(target_buffer, 0, target_buffer_size);
 	}
 
 	// Poke data into the system animation header (start of user_buffer)
@@ -296,7 +318,8 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 	sys_header -> largest_frame_size =
                  (unsigned short) (delta_buffer_size - sizeof(SysAnimHeaderType));
 
-	strcpy(sys_header->file_name, file_name);
+	strncpy(sys_header->file_name, file_name, sizeof(sys_header->file_name) - 1);
+	sys_header->file_name[sizeof(sys_header->file_name) - 1] = 0;
 
 	// Figure how much room the frame offsets take up in the file.
 	// Add 2 - one for the wrap around and one for the final end offset.
@@ -347,7 +370,11 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 	// Read the first frame into the delta buffer and uncompress it.
 	// Then close it.
 	Seek_File( fh, WSA_FILE_HEADER_SIZE + offsets_size + palette_adjust, SEEK_SET);
-	Read_File( fh, delta_back, frame0_size);
+	if (Read_File(fh, delta_back, frame0_size) != frame0_size) {
+		Close_File(fh);
+		if (anim_flags & WSA_SYS_ALLOCATED) Free(user_buffer);
+		return NULL;
+	}
 
 	// We do not use the file handle when it is in RAM.
 	if (anim_flags & WSA_RESIDENT) {
@@ -358,7 +385,7 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 		sys_header -> file_handle = (short)fh;
 	}
 
-	LCW_Uncompress(delta_back, delta_buffer, sys_header->largest_frame_size);
+	if (frame0_size) LCW_Uncompress(delta_back, delta_buffer, sys_header->largest_frame_size);
 
 	// Finally set the flags,
 	sys_header->flags = (short)anim_flags;
@@ -383,6 +410,10 @@ void * __cdecl Open_Animation(char const *file_name, char *user_buffer, long use
 void __cdecl Close_Animation( void *handle )
 {
 	SysAnimHeaderType *sys_header;
+
+	if (!handle) {
+		return;
+	}
 
 	// Assign our local system header pointer to the beginning of the handle space
 	sys_header = (SysAnimHeaderType *) handle;
@@ -432,13 +463,16 @@ BOOL __cdecl Animate_Frame(void *handle, GraphicViewPortClass& view,
 
 	// Assign local pointer to the beginning of the buffer where the system information
 	// resides
+	if (!handle) {
+		return FALSE;
+	}
 	sys_header = (SysAnimHeaderType 	*)handle;
 
 	// Get the total number of frames
 	total_frames = sys_header->total_frames;
 
 	// Are the animation handle and the frame number valid?
-	if (!handle || (total_frames <= frame_number)) {
+	if (frame_number < 0 || (total_frames <= frame_number)) {
 		return FALSE;
 	}
 
@@ -548,7 +582,10 @@ BOOL __cdecl Animate_Frame(void *handle, GraphicViewPortClass& view,
 			// Move the logical frame number ordinally right
 			curr_frame += search_dir;
 
-			Apply_Delta(sys_header, curr_frame, frame_buffer, dest_width);
+			if (!Apply_Delta(sys_header, curr_frame, frame_buffer, dest_width)) {
+				view.Unlock();
+				return FALSE;
+			}
 
 			// Adjust the current frame number, taking into consideration that we could
 			// have wrapped
@@ -568,7 +605,10 @@ BOOL __cdecl Animate_Frame(void *handle, GraphicViewPortClass& view,
 				curr_frame = total_frames;
 			}
 
-			Apply_Delta(sys_header, curr_frame, frame_buffer, dest_width);
+			if (!Apply_Delta(sys_header, curr_frame, frame_buffer, dest_width)) {
+				view.Unlock();
+				return FALSE;
+			}
 
 			curr_frame += search_dir;
 		}
@@ -996,12 +1036,14 @@ PRIVATE unsigned long Get_File_Frame_Offset( int file_handle, int frame, int pal
 {
 	uint32_t offset;
 
-	Seek_File(file_handle, (frame * WSA_FILE_OFFSET_SIZE) + WSA_FILE_HEADER_SIZE, SEEK_SET);
+	Seek_File(file_handle, (frame << 2) + WSA_FILE_HEADER_SIZE, SEEK_SET);
 
-	if (Read_File(file_handle, (char *) &offset, WSA_FILE_OFFSET_SIZE) != WSA_FILE_OFFSET_SIZE) {
+	if (Read_File(file_handle, (char *) &offset, sizeof(offset)) != sizeof(offset)) {
 		offset = 0L;
 	}
-	offset += palette_adjust;
+	if (offset) {
+		offset += palette_adjust;
+	}
 	return( offset );
 }
 
@@ -1023,7 +1065,8 @@ PRIVATE BOOL Apply_Delta(SysAnimHeaderType *sys_header, int curr_frame, char *de
 {
 	char *data_ptr, *delta_back;
 	int file_handle, palette_adjust;
-	unsigned long frame_data_size, frame_offset;
+	unsigned long frame_data_size, frame_offset, next_frame_offset;
+	if (!sys_header || curr_frame < 0 || curr_frame > sys_header->total_frames) return FALSE;
 
 
 	palette_adjust = ((sys_header->flags & WSA_PALETTE_PRESENT) ? 768 : 0);
@@ -1037,7 +1080,16 @@ PRIVATE BOOL Apply_Delta(SysAnimHeaderType *sys_header, int curr_frame, char *de
 		// copy it into buffer
 
 		frame_offset = Get_Resident_Frame_Offset(sys_header->file_buffer, curr_frame);
-		frame_data_size = Get_Resident_Frame_Offset(sys_header->file_buffer, curr_frame + 1) -	frame_offset;
+		next_frame_offset = Get_Resident_Frame_Offset(sys_header->file_buffer, curr_frame + 1);
+		if (!frame_offset || next_frame_offset <= frame_offset) {
+			return(FALSE);
+		}
+		frame_data_size = next_frame_offset - frame_offset;
+		unsigned long target_size = (sys_header->flags & WSA_TARGET_IN_BUFFER) ?
+			(unsigned long)sys_header->pixel_width * sys_header->pixel_height : 0;
+		unsigned long prefix = sizeof(SysAnimHeaderType) + target_size + sys_header->largest_frame_size;
+		if (frame_data_size > sys_header->largest_frame_size || prefix > sys_header->anim_mem_size ||
+			next_frame_offset > sys_header->anim_mem_size - prefix) return FALSE;
 
 	  	data_ptr 	= (char *)Add_Long_To_Pointer(sys_header->file_buffer, frame_offset);
 	  	delta_back 	= (char *)Add_Long_To_Pointer(delta_back,
@@ -1059,9 +1111,13 @@ PRIVATE BOOL Apply_Delta(SysAnimHeaderType *sys_header, int curr_frame, char *de
 		Seek_File(file_handle, 0L, SEEK_SET);
 
 		frame_offset = Get_File_Frame_Offset(file_handle, curr_frame, palette_adjust);
-		frame_data_size = Get_File_Frame_Offset(file_handle, curr_frame + 1, palette_adjust) - frame_offset;
+		next_frame_offset = Get_File_Frame_Offset(file_handle, curr_frame + 1, palette_adjust);
 
-		if (!frame_offset || !frame_data_size) {
+		if (!frame_offset || next_frame_offset <= frame_offset) {
+			return(FALSE);
+		}
+		frame_data_size = next_frame_offset - frame_offset;
+		if (frame_data_size > sys_header->largest_frame_size) {
 			return(FALSE);
 		}
 
@@ -1071,6 +1127,8 @@ PRIVATE BOOL Apply_Delta(SysAnimHeaderType *sys_header, int curr_frame, char *de
 		if (Read_File(file_handle, delta_back, frame_data_size) != frame_data_size) {
 			return(FALSE);
 		}
+	} else {
+		return FALSE;
 	}
 
 	// Uncompress data at end of delta buffer to the beginning of delta buffer.

@@ -2,6 +2,7 @@
 #define MOBILE_ZOOM_H
 
 #include <math.h>
+#include <stdint.h>
 
 /*
  * Pinch-to-magnify for touch builds. The game still renders its full logical
@@ -24,7 +25,7 @@ struct MobileZoomRect {
 
 /*
  * The last known position of up to two fingers, in window pixels, plus what
- * is needed to recognise a quick two- or three-finger tap.
+ * is needed to recognise multi-finger taps and a two-finger double tap.
  */
 struct MobilePinchState {
 	int active[2];
@@ -38,12 +39,15 @@ struct MobilePinchState {
 	float pair_scale;
 	int down_count;
 	int max_down;
+	int had_tap;
+	uint32_t last_tap_tick;
 };
 
 static const float MobileZoom_MaxScale = 3.0f;
 static const float MobileZoom_SnapScale = 1.05f;
 static const unsigned long MobilePinch_TapMs = 300;
 static const float MobilePinch_TapTravel = 20.0f;
+static const uint32_t MobilePinch_DoubleTapMs = 450;
 
 static inline float MobileZoom_ClampFloat(float value, float min_value, float max_value)
 {
@@ -215,6 +219,8 @@ static inline void MobilePinch_Init(MobilePinchState *pinch)
 	pinch->pair_scale = 1.0f;
 	pinch->down_count = 0;
 	pinch->max_down = 0;
+	pinch->had_tap = 0;
+	pinch->last_tap_tick = 0;
 }
 
 static inline int MobilePinch_Slot(MobilePinchState const *pinch, long long finger)
@@ -277,6 +283,24 @@ static inline int MobilePinch_EndTapFingers(MobilePinchState *pinch, unsigned lo
 		return 0;
 	}
 	return pinch->max_down >= 3 ? 3 : 2;
+}
+
+/* Two quick two-finger taps reset zoom. Other gestures break the pair. */
+static inline int MobilePinch_RecordTap(MobilePinchState *pinch, unsigned long tick, int fingers)
+{
+	if (!pinch) return 0;
+	if (fingers != 2) {
+		pinch->had_tap = 0;
+		return 0;
+	}
+	uint32_t now = (uint32_t)tick;
+	if (pinch->had_tap && (uint32_t)(now - pinch->last_tap_tick) <= MobilePinch_DoubleTapMs) {
+		pinch->had_tap = 0;
+		return 1;
+	}
+	pinch->had_tap = 1;
+	pinch->last_tap_tick = now;
+	return 0;
 }
 
 static inline void MobilePinch_Up(MobilePinchState *pinch, long long finger)

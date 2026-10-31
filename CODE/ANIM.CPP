@@ -938,12 +938,27 @@ void AnimClass::Middle(void)
 		case ANIM_NAPALM1:
 		case ANIM_NAPALM2:
 		case ANIM_NAPALM3:
-			new AnimClass(ANIM_FIRE_SMALL, Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x0040), true), 0, Random_Pick(1, 2));
-			if (Percent_Chance(50)) {
-				new AnimClass(ANIM_FIRE_SMALL, Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x00A0), true), 0, Random_Pick(1, 2));
+			{
+				// Shared simulation RNG: scatter, then delay, then loop count.
+				COORDINATE const scatter = Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x0040), true);
+				int const loops = Random_Pick(1, 2);
+				new AnimClass(ANIM_FIRE_SMALL, scatter, 0, loops);
 			}
 			if (Percent_Chance(50)) {
-				new AnimClass(ANIM_FIRE_MED, Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x0070), true), 0, Random_Pick(1, 2));
+				{
+					// Shared simulation RNG: scatter, then delay, then loop count.
+					COORDINATE const scatter = Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x00A0), true);
+					int const loops = Random_Pick(1, 2);
+					new AnimClass(ANIM_FIRE_SMALL, scatter, 0, loops);
+				}
+			}
+			if (Percent_Chance(50)) {
+				{
+					// Shared simulation RNG: scatter, then delay, then loop count.
+					COORDINATE const scatter = Map.Closest_Free_Spot(Coord_Scatter(Center_Coord(), 0x0070), true);
+					int const loops = Random_Pick(1, 2);
+					new AnimClass(ANIM_FIRE_MED, scatter, 0, loops);
+				}
 			}
 			break;
 
