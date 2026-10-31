@@ -125,7 +125,7 @@ assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_main"
 assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_GetPrefPath"
 assert_file_contains PORT/IOS/src/ios_main.cpp "SDL_GetBasePath"
 assert_file_contains PORT/IOS/src/ios_main.cpp "sync_directory_recursive"
-assert_file_contains PORT/IOS/src/ios_main.cpp "symlink(source, dest)"
+assert_file_contains PORT/IOS/src/ios_main.cpp 'symlink(source, &temporary[0])'
 assert_file_contains PORT/IOS/src/ios_main.cpp "copy_file(source_path.c_str(), dest_path.c_str())"
 assert_file_contains PORT/IOS/src/ios_main.cpp "redalert-root"
 assert_file_contains PORT/IOS/src/ios_app_delegate.m "RedAlertIOSDelegate"
@@ -489,6 +489,9 @@ inc_winvq_ww=(-I"$tmpdir/casefold/winvq/include/wwlib32" -I"$ROOT_DIR/WINVQ/INCL
 
 "${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/dos_compat_test.cpp" "$ROOT_DIR/PORT/MAC/src/dos_compat.cpp" -o "$tmpdir/dos_compat_test"
 "$tmpdir/dos_compat_test"
+
+"${cxx_cmd[@]}" "${inc_port[@]}" "$ROOT_DIR/tests/ios_asset_sync_test.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/ios_asset_sync_test"
+"$tmpdir/ios_asset_sync_test" "$tmpdir/ios-assets"
 
 "${cxx_cmd[@]}" -DTRUE_FALSE_DEFINED "${inc_port[@]}" "${inc_win_include[@]}" "${inc_win_audio[@]}" \
   "$ROOT_DIR/tests/audio_shim_test.cpp" "$ROOT_DIR/PORT/MAC/src/mac_audio_stub.cpp" $(pkg-config --cflags --libs sdl2) -o "$tmpdir/audio_shim_test"

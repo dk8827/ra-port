@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <string>
+#include <vector>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -113,7 +115,10 @@ static bool copy_file(char const *source, char const *dest)
 		return false;
 	}
 
-	int out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	std::string pattern = std::string(dest) + ".tmp.XXXXXX";
+	std::vector<char> temporary(pattern.begin(), pattern.end());
+	temporary.push_back(0);
+	int out = mkstemp(&temporary[0]);
 	if (out < 0) {
 		close(in);
 		return false;
@@ -151,6 +156,8 @@ static bool copy_file(char const *source, char const *dest)
 		ok = false;
 	}
 	close(in);
+	if (ok) ok = rename(&temporary[0], dest) == 0;
+	if (!ok) unlink(&temporary[0]);
 	return ok;
 }
 
@@ -175,9 +182,18 @@ static bool link_file(char const *source, char const *dest)
 	if (!make_directories(parent_path(dest))) {
 		return false;
 	}
-	/* Replace a link into an older install's bundle, or a full copy made by earlier builds. */
-	unlink(dest);
-	return symlink(source, dest) == 0;
+	/* Replace only after the new link exists, preserving the old asset if
+	 * creating the replacement fails. rename also replaces dangling links. */
+	std::string pattern = std::string(dest) + ".tmp.XXXXXX";
+	std::vector<char> temporary(pattern.begin(), pattern.end());
+	temporary.push_back(0);
+	int fd = mkstemp(&temporary[0]);
+	if (fd < 0) return false;
+	close(fd);
+	unlink(&temporary[0]);
+	bool ok = symlink(source, &temporary[0]) == 0 && rename(&temporary[0], dest) == 0;
+	if (!ok) unlink(&temporary[0]);
+	return ok;
 }
 
 static bool sync_directory_recursive(char const *source, char const *dest)
@@ -220,8 +236,9 @@ static bool sync_directory_recursive(char const *source, char const *dest)
 					ok = false;
 					break;
 				}
-			} else if (lstat(dest_path.c_str(), &dest_info) != 0) {
-				/* Copy small files only once, so changes the game makes to them are kept. */
+			} else if (lstat(dest_path.c_str(), &dest_info) != 0 || S_ISLNK(dest_info.st_mode)) {
+				/* Preserve existing writable files, but replace links to older
+				 * bundles even when the new asset is now below the size cutoff. */
 				if (!copy_file(source_path.c_str(), dest_path.c_str())) {
 					ok = false;
 					break;
@@ -262,7 +279,7 @@ static bool sync_bundled_assets_to(std::string const &writable_root)
 	return path_exists(join_path(writable_root, config_path()).c_str());
 }
 
-static void select_resource_root(void)
+static bool select_resource_root(void)
 {
 	char *pref_path = SDL_GetPrefPath("ra-port", "RedAlert");
 	if (pref_path) {
@@ -273,9 +290,12 @@ static void select_resource_root(void)
 		 * Run on every launch: each app update installs the bundle at a new
 		 * path, so the links to its large files must be refreshed.
 		 */
-		sync_bundled_assets_to(writable_root);
+		if (!sync_bundled_assets_to(writable_root)) {
+			fprintf(stderr, "Unable to synchronize bundled Red Alert assets into %s\n", writable_root.c_str());
+			return false;
+		}
 		if (use_resource_root(writable_root)) {
-			return;
+			return true;
 		}
 	}
 
@@ -283,13 +303,14 @@ static void select_resource_root(void)
 	if (base_path) {
 		std::string bundle_root = base_path;
 		SDL_free(base_path);
-		use_resource_root(bundle_root);
+		return use_resource_root(bundle_root);
 	}
+	return false;
 }
 
 extern "C" int SDL_main(int argc, char **argv)
 {
-	select_resource_root();
+	if (!select_resource_root()) return 1;
 
 	std::string command_line;
 	for (int index = 1; index < argc; ++index) {
