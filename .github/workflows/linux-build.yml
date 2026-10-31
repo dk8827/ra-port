@@ -28,7 +28,9 @@ jobs:
         run: cmake -S . -B build-linux -G Ninja
 
       - name: Build
-        run: cmake --build build-linux --target redalert_linux -j 3
+        run: cmake --build build-linux --target redalert_linux connection_test -j 3
 
       - name: Test
-        run: tests/run_script_tests.sh
+        run: |
+          tests/run_script_tests.sh
+          ctest --test-dir build-linux --output-on-failure

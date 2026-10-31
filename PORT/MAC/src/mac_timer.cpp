@@ -87,7 +87,7 @@ void MacMM_PumpTimers(void)
 	for (int index = 0; index < timer_count(); ++index) {
 		MacMMTimerEvent *timer = &MacMMTimers[index];
 		if (!timer->active || !timer->callback) continue;
-		if ((long)(now - timer->next_due) < 0) continue;
+		if ((LONG)(now - timer->next_due) < 0) continue;
 
 		UINT id = timer->id;
 		UINT flags = timer->flags;

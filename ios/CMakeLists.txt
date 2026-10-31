@@ -74,7 +74,10 @@ add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/third_party/SDL" "${CMAKE_BINARY_DIR
 
 include("${CMAKE_CURRENT_LIST_DIR}/../cmake/ra95_common.cmake")
 
+set(RA95_IOS_ASSET_CATALOG "${CMAKE_CURRENT_LIST_DIR}/Assets.xcassets")
+
 add_executable(redalert_ios MACOSX_BUNDLE
+    "${RA95_IOS_ASSET_CATALOG}"
     "${RA95_REPO_ROOT}/PORT/IOS/src/ios_app_delegate.m"
     "${RA95_REPO_ROOT}/PORT/IOS/src/ios_main.cpp"
     ${RA95_PLATFORM_SDL_SOURCES}
@@ -124,6 +127,8 @@ set_target_properties(redalert_ios PROPERTIES
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${RA95_IOS_BUNDLE_ID}"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+    RESOURCE "${RA95_IOS_ASSET_CATALOG}"
 )
 
 add_custom_command(TARGET redalert_ios POST_BUILD

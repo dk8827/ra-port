@@ -2841,7 +2841,10 @@ static void Create_Units(bool official)
 //	int deficiency = (Session.Players.Count() + Session.Options.AIPlayers) - num_waypts;
 	if (deficiency > 0) {
 		for (int index = 0; index < deficiency; index++) {
-			CELL trycell = XY_Cell(Map.MapCellX + Random_Pick(0, Map.MapCellWidth-1), Map.MapCellY + Random_Pick(0, Map.MapCellHeight-1));
+			// Keep the shared random draws in the same order on every compiler.
+			int x = Map.MapCellX + Random_Pick(0, Map.MapCellWidth-1);
+			int y = Map.MapCellY + Random_Pick(0, Map.MapCellHeight-1);
+			CELL trycell = XY_Cell(x, y);
 
 			trycell = Map.Nearby_Location(trycell, SPEED_TRACK);
 			waypts[num_waypts] = trycell;

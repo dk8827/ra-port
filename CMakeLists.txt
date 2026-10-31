@@ -48,3 +48,17 @@ elseif(UNIX)
 else()
     message(FATAL_ERROR "The desktop CMake target currently supports macOS and Linux only.")
 endif()
+
+enable_testing()
+add_executable(connection_test tests/connection_test.cpp CODE/CONNECT.CPP CODE/COMBUF.CPP)
+ra95_configure_target(connection_test)
+target_compile_options(connection_test PRIVATE "-iquote${RA95_CASEFOLD_INCLUDE_ROOT}/code")
+if(UNIX AND NOT APPLE)
+    target_compile_options(connection_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(connection_test PRIVATE "LINKER:--gc-sections")
+endif()
+add_test(NAME connection COMMAND connection_test)
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+add_test(NAME combat_rng COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_engine_regression.py" "${CMAKE_BINARY_DIR}")

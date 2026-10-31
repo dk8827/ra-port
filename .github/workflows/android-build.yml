@@ -1,0 +1,58 @@
+name: Android build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.4.1'
+
+      - name: Prepare build-only asset stub
+        run: |
+          mkdir -p assets/redalert/allies/INSTALL
+          printf '[REDALERT]\n' > assets/redalert/allies/INSTALL/REDALERT.INI
+
+      - name: Build Android APK
+        run: scripts/build_android_debug.sh -- --no-daemon --stacktrace
+
+      - name: Verify native libraries are packaged
+        run: |
+          unzip -Z1 android/app/build/outputs/apk/debug/app-debug.apk > apk-files.txt
+          grep -Fx 'lib/arm64-v8a/libmain.so' apk-files.txt
+          grep -Fx 'lib/arm64-v8a/libSDL2.so' apk-files.txt
+
+      - name: Upload build-check APK (no game data)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ra-port-android-build-check
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

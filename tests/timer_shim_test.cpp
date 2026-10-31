@@ -18,6 +18,23 @@ static void fail(char const *message)
 
 int main()
 {
+	// Windows permits fresh critical-section storage to contain arbitrary bytes.
+	CRITICAL_SECTION section;
+	memset(&section, 0xa5, sizeof(section));
+	InitializeCriticalSection(&section);
+	if (pthread_mutex_trylock(&section.mutex) != 0) fail("critical section was not initialized");
+	if (pthread_mutex_trylock(&section.mutex) != 0) fail("critical section is not recursive");
+	LeaveCriticalSection(&section);
+	LeaveCriticalSection(&section);
+	DeleteCriticalSection(&section);
+	if (section.initialized) fail("critical section was not deleted");
+
+	// Future deadlines must remain in the future on LP64 hosts too.
+	MMRESULT future = timeSetEvent(10000, 1, timer_callback, 0, TIME_ONESHOT);
+	MacMM_PumpTimers();
+	timeKillEvent(future);
+	if (CallbackCount) fail("timer fired before its deadline");
+
 	MMRESULT timer = timeSetEvent(10, 1, timer_callback, 0, TIME_PERIODIC);
 	if (timer == 0) fail("timeSetEvent returned zero");
 

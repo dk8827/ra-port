@@ -7577,6 +7577,9 @@ CELL HouseClass::Random_Cell_In_Zone(ZoneType zone) const
 {
 	COORDINATE coord = 0;
 	int maxdist = 0;
+	DirType direction;
+	int distance;
+	// Shared random draws must run direction first, then distance, on every compiler.
 	switch (zone) {
 		case ZONE_CORE:
 			coord = Coord_Scatter(Center, Random_Pick(0, Radius), true);
@@ -7585,25 +7588,33 @@ CELL HouseClass::Random_Cell_In_Zone(ZoneType zone) const
 		case ZONE_NORTH:
 			maxdist = min(Radius*3, (Coord_Y(Center) - Cell_To_Lepton(Map.MapCellY)) - CELL_LEPTON_H);
 			if (maxdist < 0) break;
-			coord = Coord_Move(Center, (DirType)(Random_Pick(DIR_N, DIR_E)-((DirType)32)), Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist)));
+			direction = (DirType)(Random_Pick(DIR_N, DIR_E)-((DirType)32));
+			distance = Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist));
+			coord = Coord_Move(Center, direction, distance);
 			break;
 
 		case ZONE_EAST:
 			maxdist = min(Radius*3, (Cell_To_Lepton(Map.MapCellX + Map.MapCellWidth) - Coord_X(Center)) - CELL_LEPTON_W);
 			if (maxdist < 0) break;
-			coord = Coord_Move(Center, Random_Pick(DIR_NE, DIR_SE), Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist)));
+			direction = Random_Pick(DIR_NE, DIR_SE);
+			distance = Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist));
+			coord = Coord_Move(Center, direction, distance);
 			break;
 
 		case ZONE_SOUTH:
 			maxdist = min(Radius*3, (Cell_To_Lepton(Map.MapCellY + Map.MapCellHeight) - Coord_Y(Center)) - CELL_LEPTON_H);
 			if (maxdist < 0) break;
-			coord = Coord_Move(Center, Random_Pick(DIR_SE, DIR_SW), Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist)));
+			direction = Random_Pick(DIR_SE, DIR_SW);
+			distance = Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist));
+			coord = Coord_Move(Center, direction, distance);
 			break;
 
 		case ZONE_WEST:
 			maxdist = min(Radius*3, (Coord_X(Center) - Cell_To_Lepton(Map.MapCellX)) - CELL_LEPTON_W);
 			if (maxdist < 0) break;
-			coord = Coord_Move(Center, Random_Pick(DIR_SW, DIR_NW), Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist)));
+			direction = Random_Pick(DIR_SW, DIR_NW);
+			distance = Random_Pick(min(Radius*2, maxdist), min(Radius*3, maxdist));
+			coord = Coord_Move(Center, direction, distance);
 			break;
 	}
 

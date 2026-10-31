@@ -19,7 +19,9 @@ jobs:
         run: cmake -S . -B build -G Ninja
 
       - name: Build
-        run: cmake --build build --target redalert_mac -j 3
+        run: cmake --build build --target redalert_mac connection_test -j 3
 
       - name: Test
-        run: tests/run_script_tests.sh
+        run: |
+          tests/run_script_tests.sh
+          ctest --test-dir build --output-on-failure
