@@ -21,6 +21,7 @@ static int MacHeight = 0;
 static bool MacSDLReady = false;
 static bool MacQuitRequested = false;
 static bool MacFullscreen = false;
+static bool MacPresenting = false;
 static SDL_threadID MacMainThread = 0;
 static uint32_t MacPalette[256];
 static MSG MacMessageQueue[512];
@@ -125,14 +126,13 @@ static BOOL mac_queue_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lpa
 	return TRUE;
 }
 
-static void mac_queue_mouse_motion(int x, int y)
+static void mac_update_mouse_position(int x, int y)
 {
 #if defined(RA_MOBILE_TOUCH)
 	MobileTouchCursorHidden = false;
 #endif
 	MacMousePoint.x = x;
 	MacMousePoint.y = y;
-	mac_queue_message((HWND)(intptr_t)1, WM_MOUSEMOVE, 0, mac_pack_xy(x, y));
 }
 
 static void mac_queue_mouse_button_with_cursor(int vk, bool down, int x, int y, bool update_cursor)
@@ -429,7 +429,7 @@ static void mobile_queue_touch_output(MobileTouchGestureOutput const *out)
 		MobileTouchGestureEvent const *touch_event = &out->events[index];
 		switch (touch_event->type) {
 			case MOBILE_TOUCH_MOUSE_MOVE:
-				mac_queue_mouse_motion(touch_event->x, touch_event->y);
+				mac_update_mouse_position(touch_event->x, touch_event->y);
 				break;
 			case MOBILE_TOUCH_LEFT_DOWN:
 				mac_queue_mouse_button_with_cursor(VK_LBUTTON, true, touch_event->x, touch_event->y, touch_event->update_cursor != 0);
@@ -500,8 +500,6 @@ bool MacSDL_SetMode(int width, int height)
 #if defined(RA_MOBILE_TOUCH)
 		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-#else
-		SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 #endif
 		SDL_SetHint(SDL_HINT_RENDER_LOGICAL_SIZE_MODE, "letterbox");
 #if defined(RA_IOS) || defined(RA_ANDROID)
@@ -555,12 +553,13 @@ bool MacSDL_SetMode(int width, int height)
 	if (!MacWindow) {
 		return false;
 	}
+	SDL_ShowCursor(SDL_DISABLE);
 
-	Uint32 renderer_flags = SDL_RENDERER_SOFTWARE;
-#if defined(RA_MOBILE_TOUCH)
-	renderer_flags = SDL_RENDERER_ACCELERATED;
-#endif
+	Uint32 renderer_flags = SDL_RENDERER_ACCELERATED;
 	MacRenderer = SDL_CreateRenderer(MacWindow, -1, renderer_flags);
+	if (!MacRenderer) {
+		MacRenderer = SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);
+	}
 	if (!MacRenderer) {
 		mac_destroy_video_objects();
 		return false;
@@ -629,7 +628,7 @@ static void mac_sdl_pump_events(bool allow_idle_delay)
 				int x = event.motion.x;
 				int y = event.motion.y;
 				mac_to_logical_point(&x, &y);
-				mac_queue_mouse_motion(x, y);
+				mac_update_mouse_position(x, y);
 				break;
 			}
 
@@ -773,9 +772,14 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 	if (MacMainThread && SDL_ThreadID() != MacMainThread) {
 		return;
 	}
+	if (MacPresenting) {
+		return;
+	}
 
+	MacPresenting = true;
 	mac_sdl_pump_events(false);
 	if (!MacRenderer || !MacTexture) {
+		MacPresenting = false;
 		return;
 	}
 
@@ -783,6 +787,7 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 	if (needed > MacFramePixels) {
 		uint32_t *new_frame = (uint32_t *)realloc(MacFrame, (size_t)needed * sizeof(uint32_t));
 		if (!new_frame) {
+			MacPresenting = false;
 			return;
 		}
 		MacFrame = new_frame;
@@ -805,12 +810,14 @@ void MacSDL_Present8(unsigned char const *pixels, int width, int height, int pit
 	destination.w = viewport.w;
 	destination.h = viewport.h;
 	if (destination.w <= 0 || destination.h <= 0) {
+		MacPresenting = false;
 		return;
 	}
 	SDL_SetRenderDrawColor(MacRenderer, 0, 0, 0, 255);
 	SDL_RenderClear(MacRenderer);
 	SDL_RenderCopy(MacRenderer, MacTexture, 0, &destination);
 	SDL_RenderPresent(MacRenderer);
+	MacPresenting = false;
 }
 
 extern "C" BOOL MacWin_PeekMessage(MSG *msg, HWND, UINT, UINT, UINT remove)

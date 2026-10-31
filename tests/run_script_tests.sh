@@ -203,8 +203,11 @@ assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_emit_pan(event
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "RA_MOBILE_TOUCH"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobileTouchGesture"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "MobilePointerDragCandidate"
-assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE);"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_ACCELERATED"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_RENDERER_PRESENTVSYNC"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_CreateRenderer(MacWindow, -1, SDL_RENDERER_SOFTWARE)"
+assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_ShowCursor(SDL_DISABLE)"
+assert_file_not_contains PORT/MAC/src/mac_sdl_runtime.cpp 'SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software")'
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "mobile_idle_delay"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_Delay(1)"
 assert_file_contains PORT/MAC/src/mac_sdl_runtime.cpp "SDL_HINT_IOS_HIDE_HOME_INDICATOR"
@@ -228,6 +231,12 @@ assert_file_not_contains WIN32LIB/KEYBOARD/MOUSE.CPP "#if defined(__ANDROID__)"
 
 perl -0ne 'exit(/static void mac_queue_mouse_button_with_cursor\([^\)]*\)\s*\{\s*MacMousePoint\.x\s*=\s*x;\s*MacMousePoint\.y\s*=\s*y;[\s\S]*?if \(update_cursor\)/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
   || fail "Android tap button events must update the legacy cursor position even when the touch cursor stays hidden"
+
+perl -0ne 'exit(/static void mac_update_mouse_position\([^\)]*\)\s*\{(?:(?!mac_queue_message)[\s\S])*?\}/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
+  || fail "mouse motion must update cursor state without flooding the legacy message queue"
+
+perl -0ne 'exit(/void MacSDL_Present8\([^\)]*\)\s*\{[\s\S]*if \(MacPresenting\)[\s\S]*MacPresenting = true;[\s\S]*SDL_RenderPresent\(MacRenderer\);[\s\S]*MacPresenting = false;/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
+  || fail "nested primary-surface writes must not trigger nested presentations"
 
 perl -0ne 'exit(/Uint32 window_flags = SDL_WINDOW_SHOWN \| SDL_WINDOW_RESIZABLE;[\s\S]*#if defined\(RA_MOBILE_TOUCH\)[\s\S]*window_flags \|= SDL_WINDOW_BORDERLESS;[\s\S]*#endif/s ? 0 : 1)' "$ROOT_DIR/PORT/MAC/src/mac_sdl_runtime.cpp" \
   || fail "mobile SDL windows must be borderless so iOS hides system chrome"
